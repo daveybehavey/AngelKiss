@@ -83,10 +83,90 @@ export type PublicProductDetail = PublicProductBase & {
 
 export type ListPublicProductsOptions = {
   category?: ProductCategory;
+  /** Only applied when `category` is `custom_sublimation` (filters via DB join). */
+  sublimationMode?: SublimationMode;
   q?: string;
   limit: number;
   cursor?: string;
 };
+
+const PRODUCT_SUMMARY_COLUMNS =
+  "id,slug,name,category,short_description,base_price_cents,currency,inventory_mode,stock_quantity,reserved_quantity,low_stock_threshold,is_available,status,created_at,updated_at,deleted_at";
+
+export type PublishedShopOverview = {
+  total: number;
+  handmade: number;
+  customSublimation: number;
+  customUpload: number;
+  readyMade: number;
+};
+
+/**
+ * Lightweight shop dashboard counts (two parallel queries, no image signing).
+ */
+export async function getPublishedShopOverview(
+  supabase: SupabaseClient
+): Promise<PublishedShopOverview> {
+  const [productsRes, customRes] = await Promise.all([
+    supabase
+      .from("products")
+      .select("id, category")
+      .is("deleted_at", null)
+      .eq("status", "published")
+      .eq("is_available", true),
+    supabase.from("custom_sublimation_products").select("product_id, allow_image_upload")
+  ]);
+
+  if (productsRes.error) {
+    throw new Error(productsRes.error.message || "Failed to load products for overview");
+  }
+  if (customRes.error) {
+    throw new Error(customRes.error.message || "Failed to load sublimation overview");
+  }
+
+  const products = (productsRes.data ?? []) as Pick<ProductRow, "id" | "category">[];
+  const uploadPreference = new Map<string, boolean>(
+    (customRes.data ?? []).map((row: { product_id: string; allow_image_upload: boolean }) => [
+      row.product_id,
+      row.allow_image_upload
+    ])
+  );
+
+  let handmade = 0;
+  let customSublimation = 0;
+  let customUpload = 0;
+  let readyMade = 0;
+
+  for (const product of products) {
+    if (product.category === "handmade_crochet_knit") {
+      handmade += 1;
+      continue;
+    }
+    if (product.category !== "custom_sublimation") {
+      continue;
+    }
+    customSublimation += 1;
+    const prefersUpload = uploadPreference.get(product.id);
+    if (prefersUpload === true) {
+      customUpload += 1;
+    } else if (prefersUpload === false) {
+      readyMade += 1;
+    }
+  }
+
+  return {
+    total: products.length,
+    handmade,
+    customSublimation,
+    customUpload,
+    readyMade
+  };
+}
+
+function stripProductJoinRow(row: Record<string, unknown>): ProductRow {
+  const { custom_sublimation_products: _join, ...rest } = row;
+  return rest as ProductRow;
+}
 
 function canPurchase(inventoryMode: InventoryMode, availableQuantity: number | null): boolean {
   if (inventoryMode === "made_to_order") {
@@ -174,19 +254,33 @@ export async function listPublicProducts(
   supabase: SupabaseClient,
   options: ListPublicProductsOptions
 ): Promise<{ items: PublicProductSummary[]; nextCursor: string | null }> {
+  const useSublimationJoin =
+    options.category === "custom_sublimation" && options.sublimationMode !== undefined;
+
+  const selectColumns = useSublimationJoin
+    ? `${PRODUCT_SUMMARY_COLUMNS},custom_sublimation_products!inner(allow_image_upload)`
+    : PRODUCT_SUMMARY_COLUMNS;
+
   let query = supabase
     .from("products")
-    .select(
-      "id,slug,name,category,short_description,base_price_cents,currency,inventory_mode,stock_quantity,reserved_quantity,low_stock_threshold,is_available,status,created_at,updated_at,deleted_at"
-    )
+    .select(selectColumns)
     .is("deleted_at", null)
     .eq("status", "published")
     .eq("is_available", true)
     .order("created_at", { ascending: false })
     .limit(options.limit + 1);
 
-  if (options.category) {
+  if (options.category && !useSublimationJoin) {
     query = query.eq("category", options.category);
+  }
+
+  if (useSublimationJoin) {
+    query = query
+      .eq("category", "custom_sublimation")
+      .eq(
+        "custom_sublimation_products.allow_image_upload",
+        options.sublimationMode === "customer_upload"
+      );
   }
 
   if (options.cursor) {
@@ -205,7 +299,10 @@ export async function listPublicProducts(
     throw new Error(error.message || "Failed to list products");
   }
 
-  const rows = (data ?? []) as ProductRow[];
+  const rawRows = (data ?? []) as unknown[];
+  const rows: ProductRow[] = useSublimationJoin
+    ? rawRows.map((row) => stripProductJoinRow(row as Record<string, unknown>))
+    : (rawRows as ProductRow[]);
   const pageRows = rows.slice(0, options.limit);
   const productIds = pageRows.map((row) => row.id);
 
@@ -296,7 +393,7 @@ export async function getPublicProductBySlug(
     return null;
   }
 
-  const { data: imageRows, error: imagesError } = await supabase
+  const imagesQuery = supabase
     .from("product_images")
     .select("id,product_id,storage_path,alt_text,sort_order,is_primary")
     .eq("product_id", product.id)
@@ -304,11 +401,28 @@ export async function getPublicProductBySlug(
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
-  if (imagesError) {
-    throw new Error(imagesError.message || "Failed to fetch product images");
+  const categoryDetailsQuery =
+    product.category === "custom_sublimation"
+      ? supabase
+          .from("custom_sublimation_products")
+          .select(
+            "template_image_path,default_blank_color,safe_area_x,safe_area_y,safe_area_width,safe_area_height,max_upload_mb,allow_image_upload,allow_text_overlay,max_text_layers,allowed_fonts"
+          )
+          .eq("product_id", product.id)
+          .maybeSingle()
+      : supabase
+          .from("handmade_products")
+          .select("material,care_instructions,lead_time_days,personalization_available")
+          .eq("product_id", product.id)
+          .maybeSingle();
+
+  const [imagesResult, detailsResult] = await Promise.all([imagesQuery, categoryDetailsQuery]);
+
+  if (imagesResult.error) {
+    throw new Error(imagesResult.error.message || "Failed to fetch product images");
   }
 
-  const images = (imageRows ?? []) as ProductImageRow[];
+  const images = (imagesResult.data ?? []) as ProductImageRow[];
   const signedUrlsByStoragePath = await signImagePaths(
     supabase,
     images.map((image) => image.storage_path)
@@ -327,35 +441,22 @@ export async function getPublicProductBySlug(
   let handmadeDetails: HandmadePublicDetails | null = null;
   let sublimationMode: SublimationMode | null = null;
 
+  if (detailsResult.error) {
+    throw new Error(
+      detailsResult.error.message ||
+        (product.category === "custom_sublimation"
+          ? "Failed to fetch custom sublimation details"
+          : "Failed to fetch handmade details")
+    );
+  }
+
   if (product.category === "custom_sublimation") {
-    const { data: details, error: detailsError } = await supabase
-      .from("custom_sublimation_products")
-      .select(
-        "template_image_path,default_blank_color,safe_area_x,safe_area_y,safe_area_width,safe_area_height,max_upload_mb,allow_image_upload,allow_text_overlay,max_text_layers,allowed_fonts"
-      )
-      .eq("product_id", product.id)
-      .maybeSingle();
-
-    if (detailsError) {
-      throw new Error(detailsError.message || "Failed to fetch custom sublimation details");
-    }
-
-    customDetails = (details as CustomSublimationPublicDetails | null) ?? null;
+    customDetails = (detailsResult.data as CustomSublimationPublicDetails | null) ?? null;
     if (customDetails) {
       sublimationMode = mapSublimationMode(customDetails.allow_image_upload);
     }
   } else {
-    const { data: details, error: detailsError } = await supabase
-      .from("handmade_products")
-      .select("material,care_instructions,lead_time_days,personalization_available")
-      .eq("product_id", product.id)
-      .maybeSingle();
-
-    if (detailsError) {
-      throw new Error(detailsError.message || "Failed to fetch handmade details");
-    }
-
-    handmadeDetails = (details as HandmadePublicDetails | null) ?? null;
+    handmadeDetails = (detailsResult.data as HandmadePublicDetails | null) ?? null;
   }
 
   const primaryImage = mappedImages.find((image) => image.is_primary) ?? mappedImages[0] ?? null;

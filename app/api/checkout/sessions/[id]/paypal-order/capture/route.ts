@@ -54,11 +54,20 @@ export async function POST(
         .eq("checkout_session_id", checkout.id)
         .maybeSingle();
 
+      const orderNumber =
+        order && typeof order.order_number === "number" ? String(order.order_number) : null;
+
       return NextResponse.json(
         {
           checkoutSessionId: checkout.id,
-          alreadyCompleted: true,
-          order: order ?? null
+          paypalOrderId: checkout.paypal_order_id ?? "",
+          paypalStatus: "COMPLETED",
+          finalized: true,
+          orderId: order?.id ?? null,
+          orderNumber,
+          message:
+            "Your payment was already received. Here is your order reference—save it in case you need to contact us.",
+          alreadyCompleted: true
         },
         { status: 200 }
       );
@@ -114,14 +123,34 @@ export async function POST(
 
     const row = Array.isArray(webhookResult) ? webhookResult[0] : null;
 
+    let orderNumber: string | null = null;
+    const createdOrderId = row?.order_id ?? null;
+    if (createdOrderId) {
+      const { data: orderRow } = await supabase
+        .from("orders")
+        .select("order_number")
+        .eq("id", createdOrderId)
+        .maybeSingle();
+      if (orderRow && typeof orderRow.order_number === "number") {
+        orderNumber = String(orderRow.order_number);
+      }
+    }
+
     return NextResponse.json(
       {
         checkoutSessionId: checkout.id,
         paypalOrderId: checkout.paypal_order_id,
         paypalStatus: captureResult.status,
         finalized: row?.processed ?? false,
-        orderId: row?.order_id ?? null,
-        message: row?.message ?? null
+        orderId: createdOrderId,
+        orderNumber,
+        message: row?.processed
+          ? orderNumber
+            ? null
+            : "Your order is confirmed."
+          : (row?.message ??
+            "Payment captured; our system is still finalizing your order. Email us if anything looks wrong."),
+        alreadyCompleted: false
       },
       { status: 200 }
     );

@@ -10,6 +10,7 @@ import {
   validateShippingOriginInput
 } from "@/lib/admin/shipping-validation";
 import { lineTotalCents, type CheckoutShippingAddress } from "@/lib/storefront/cart";
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 type CheckoutResult = {
@@ -256,8 +257,8 @@ export default function CheckoutPage() {
           Add your shipping details, review your order, then pay securely with PayPal.
         </p>
         <p className="page-link-row">
-          <a href="/shop">Shop</a>
-          <a href="/cart">Cart</a>
+          <Link href="/shop">Shop</Link>
+          <Link href="/cart">Cart</Link>
         </p>
       </section>
 
@@ -486,11 +487,12 @@ export default function CheckoutPage() {
             {busy ? "Preparing checkout..." : "Continue to payment"}
           </button>
         </form>
-        <p className="checkout-helper-note">
-          By continuing, you accept our{" "}
-          <a href="/shipping">Shipping Policy</a> and{" "}
-          <a href="/returns">Returns &amp; Refunds</a>.
-        </p>
+          <p className="checkout-helper-note">
+            By continuing, you accept our{" "}
+            <Link href="/shipping">Shipping Policy</Link>,{" "}
+            <Link href="/returns">Returns &amp; Refunds</Link>, and{" "}
+            <Link href="/privacy">Privacy Policy</Link>.
+          </p>
       </section>
 
       {error ? <p className="checkout-error">{error}</p> : null}
@@ -534,11 +536,65 @@ export default function CheckoutPage() {
           ) : null}
 
           {paymentResult ? (
-            <section className="checkout-payment-success">
-              <h3>You&apos;re All Set</h3>
-              <p>PayPal Order: {paymentResult.paypalOrderId}</p>
-              <p>Order ID: {paymentResult.orderId ?? "Pending"}</p>
-              <p>{paymentResult.message ?? "Order processed."}</p>
+            <section className="checkout-payment-success" aria-live="polite">
+              <p className="checkout-success-eyebrow">Thank you</p>
+              <h3 className="checkout-success-title">
+                {shippingAddress.full_name.trim()
+                  ? `You're all set, ${shippingAddress.full_name.trim().split(/\s+/)[0]}!`
+                  : "You're all set!"}
+              </h3>
+              {paymentResult.orderNumber ? (
+                <p className="checkout-order-number">
+                  <span className="checkout-order-label">Your order number</span>
+                  <span className="checkout-order-value">#{paymentResult.orderNumber}</span>
+                </p>
+              ) : null}
+              {!paymentResult.finalized ? (
+                <p className="checkout-success-warn">
+                  Payment went through, but our system is still finalizing your order. If you
+                  don&apos;t see a confirmation email within 24 hours, email us with the references
+                  below.
+                </p>
+              ) : null}
+              <p className="checkout-success-body">
+                {paymentResult.message?.trim() ||
+                  "Your order is confirmed. We'll prepare it with care and send updates if anything is unclear."}
+              </p>
+              <ol className="checkout-success-steps">
+                <li>Your payment was processed securely with PayPal.</li>
+                <li>
+                  We may contact you at{" "}
+                  <strong>{email.trim() || "the email address you used at checkout"}</strong> if we
+                  have a question about personalization or shipping.
+                </li>
+                <li>
+                  Need help? Email{" "}
+                  <a href="mailto:anglkisscreations@gmail.com">anglkisscreations@gmail.com</a>
+                  {paymentResult.orderNumber ? (
+                    <>
+                      {" "}
+                      and include order <strong>#{paymentResult.orderNumber}</strong>
+                    </>
+                  ) : null}
+                  .
+                </li>
+              </ol>
+              <p className="page-link-row checkout-success-actions">
+                <Link href="/shop" className="btn btn-primary">
+                  Continue shopping
+                </Link>
+                <Link href="/">Back to home</Link>
+              </p>
+              <details className="checkout-success-meta">
+                <summary>Payment details (for support)</summary>
+                <p>Checkout reference: {result.checkoutSessionId}</p>
+                {paymentResult.paypalOrderId ? (
+                  <p>PayPal order: {paymentResult.paypalOrderId}</p>
+                ) : null}
+                {paymentResult.orderId && !paymentResult.orderNumber ? (
+                  <p>Order reference: {paymentResult.orderId}</p>
+                ) : null}
+              </details>
             </section>
           ) : null}
         </section>

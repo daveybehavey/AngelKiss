@@ -197,3 +197,35 @@ export function extractCaptureId(payload: PayPalOrderCaptureResponse): string | 
   }
   return null;
 }
+
+export type PayPalVerifyWebhookSignatureResponse = {
+  verification_status: string;
+};
+
+/**
+ * Calls PayPal `POST /v1/notifications/verify-webhook-signature`.
+ * Requires the same OAuth credentials as checkout. Returns PayPal’s status string
+ * (`SUCCESS`, `FAILURE`, etc.).
+ */
+export async function verifyPayPalWebhookSignature(input: {
+  transmissionId: string;
+  transmissionTime: string;
+  transmissionSig: string;
+  certUrl: string;
+  authAlgo: string;
+  webhookId: string;
+  webhookEvent: Record<string, unknown>;
+}): Promise<PayPalVerifyWebhookSignatureResponse> {
+  return paypalRequest<PayPalVerifyWebhookSignatureResponse>("/v1/notifications/verify-webhook-signature", {
+    method: "POST",
+    body: {
+      auth_algo: input.authAlgo,
+      cert_url: input.certUrl,
+      transmission_id: input.transmissionId,
+      transmission_sig: input.transmissionSig,
+      transmission_time: input.transmissionTime,
+      webhook_id: input.webhookId,
+      webhook_event: input.webhookEvent
+    }
+  });
+}

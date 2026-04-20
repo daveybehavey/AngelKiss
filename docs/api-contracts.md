@@ -1,4 +1,6 @@
-# AngelKiss API Contracts (MVP)
+# AnglKiss Creations API Contracts (MVP)
+
+Repository **AngelKiss**; brand **AnglKiss Creations**.
 
 ## Conventions
 - Base path: `/api`
@@ -148,32 +150,21 @@ Behavior:
 Response `200`:
 - `{ product: StorefrontProductDetail }`
 
-## 3) Customizer (Logic Endpoints)
+## 3) Storefront customization upload (Phase 1)
 
-### `POST /api/customizer/assets/upload-url`
-Request body:
-- `{ filename, content_type, product_id }`
-
-Behavior:
-- Returns signed upload URL for user-uploaded design asset.
-
-Response `200`:
-- `{ uploadUrl, storagePath, expiresAt, maxUploadMb }`
-
-### `POST /api/customizer/validate`
-Request body:
-- `product_id`
-- `customization` payload:
-  - `uploaded_image_path`
-  - `canvas_width`, `canvas_height`
-  - `safe_area`
-  - `text_layers[]`
+### `POST /api/products/:slug/customization/upload-url`
+Public. Body: `{ filename, content_type, file_size_bytes? }`.
 
 Behavior:
-- Validates payload against product rules (font whitelist, max text layers, safe area bounds).
+- Only for **published**, **available** `custom_sublimation` products with `allow_image_upload`.
+- Returns a **signed Supabase Storage** upload URL scoped to `customizations/{productId}/…`.
 
 Response `200`:
-- `{ valid: true }` or `{ valid: false, errors: string[] }`
+- `{ uploadUrl, storagePath, bucket, expiresAt, maxUploadMb, token }` (Supabase signed upload fields).
+
+Checkout (`POST /api/checkout/sessions`) accepts the resulting storage metadata under each line item’s `customization` object; see `lib/checkout/customization.ts` for the exact schema (`rights_acknowledged`, etc.).
+
+**Future (not in MVP contracts):** `/api/customizer/*` canvas validation would apply only if a Konva-style editor is added.
 
 ## 4) Checkout + Payment
 
@@ -271,9 +262,11 @@ Response `200`:
 ## 6) PayPal Webhook
 
 ### `POST /api/webhooks/paypal`
-Public endpoint verified by PayPal signature.
+Public endpoint. **When `PAYPAL_WEBHOOK_ID` is set**, the handler requires PayPal transmission headers and calls PayPal **`POST /v1/notifications/verify-webhook-signature`** before running business logic. If verification returns anything other than `verification_status: SUCCESS`, the route responds **`401`**.
 
-Behavior:
+If `PAYPAL_WEBHOOK_ID` is unset (local dev only), verification is skipped; **production must set the webhook ID**.
+
+Behavior after verification:
 - Idempotently stores webhook event by `paypal_event_id`.
 - On successful capture event:
   - creates local `orders` row from checkout session snapshot if not already created
@@ -284,7 +277,8 @@ Behavior:
 
 Response:
 - `200` for processed/duplicate events.
-- `400/401` for invalid signature payload.
+- `400` for malformed payload or RPC rejection.
+- `401` for failed signature verification when `PAYPAL_WEBHOOK_ID` is configured.
 
 ## 7) Admin Orders
 
@@ -314,3 +308,30 @@ Behavior:
 
 Response `200`:
 - `{ id, status }`
+
+## 8) Newsletter (public subscribe + admin list)
+
+### `POST /api/newsletter/subscribe`
+Public. JSON body:
+- `email` (required)
+- `company` (optional honeypot; must be empty or omitted for real signups)
+
+Behavior:
+- Normalizes and validates email server-side.
+- Inserts into `newsletter_subscribers` with `source` defaulting to `footer` (implementation-defined).
+- Duplicate email (unique on normalized address) returns a friendly message, not a server error.
+
+Response `200` / `201` (success shape is implementation-defined; includes ok/message).
+
+Response `400` for invalid email, honeypot hit, or malformed JSON.
+
+### `GET /api/admin/newsletter/subscribers`
+Admin auth required (same as other `/api/admin/*` routes).
+
+Query params:
+- `limit` optional (capped by server; e.g. up to 500)
+
+Response `200`:
+- `{ items: Array<{ email, created_at, source }> }`
+
+Response `401` when not authenticated as admin.

@@ -2,7 +2,17 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Shipping Policy",
-  description: "Shipping zones, rates, and delivery expectations for AnglKiss Creations."
+  description: "Shipping zones, rates, and delivery expectations for AnglKiss Creations.",
+  openGraph: {
+    title: "Shipping Policy | AnglKiss Creations",
+    description: "Where we ship, how rates work, and what to expect at checkout.",
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title: "Shipping Policy | AnglKiss Creations",
+    description: "Where we ship and how shipping is calculated at checkout."
+  }
 };
 
 export default function ShippingPolicyPage() {

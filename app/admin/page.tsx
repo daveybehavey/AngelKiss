@@ -263,6 +263,11 @@ export default function AdminPage() {
   const [toasts, setToasts] = useState<AdminToast[]>([]);
   const nextToastId = useRef(1);
 
+  const [newsletterItems, setNewsletterItems] = useState<
+    Array<{ email: string; created_at: string; source: string }>
+  >([]);
+  const [newsletterBusy, setNewsletterBusy] = useState(false);
+
   const pushToast = useCallback((kind: AdminToastKind, text: string) => {
     const toast: AdminToast = {
       id: nextToastId.current++,
@@ -428,6 +433,34 @@ export default function AdminPage() {
   useEffect(() => {
     void loadProducts();
     void loadShippingConfiguration();
+    if (!token) {
+      setNewsletterItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    setNewsletterBusy(true);
+    void (async () => {
+      try {
+        const headers = new Headers();
+        headers.set("Authorization", `Bearer ${token}`);
+        const response = await fetch("/api/admin/newsletter/subscribers?limit=500", { headers });
+        const json = (await response.json().catch(() => ({}))) as {
+          items?: Array<{ email: string; created_at: string; source: string }>;
+        };
+        if (!cancelled && response.ok && Array.isArray(json.items)) {
+          setNewsletterItems(json.items);
+        }
+      } finally {
+        if (!cancelled) {
+          setNewsletterBusy(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -480,6 +513,49 @@ export default function AdminPage() {
     setProducts([]);
     setAdminView("home");
     setMessage("Signed out.");
+  }
+
+  async function handleCopyNewsletterEmails() {
+    if (newsletterItems.length === 0) {
+      pushToast("error", "No subscribers on the list yet.");
+      return;
+    }
+    const text = newsletterItems.map((row) => row.email).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      pushToast("success", `Copied ${newsletterItems.length} email addresses.`);
+    } catch {
+      pushToast("error", "Could not copy automatically. Try selecting the list manually.");
+    }
+  }
+
+  function handleDownloadNewsletterCsv() {
+    if (newsletterItems.length === 0) {
+      pushToast("error", "No subscribers on the list yet.");
+      return;
+    }
+
+    const header = ["email", "source", "created_at"].join(",");
+    const rows = newsletterItems.map((row) => {
+      const email = JSON.stringify(row.email ?? "");
+      const source = JSON.stringify(row.source ?? "");
+      const createdAt = JSON.stringify(row.created_at ?? "");
+      return [email, source, createdAt].join(",");
+    });
+    const csv = [header, ...rows].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `angelkiss-newsletter-subscribers-${new Date()
+      .toISOString()
+      .slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    pushToast("success", "Downloaded CSV.");
   }
 
   function updateShippingRateDraft(
@@ -1081,15 +1157,13 @@ export default function AdminPage() {
 
   return (
     <main className="page-main admin-page">
-      <h1>Shop Admin</h1>
-      <p className="admin-lead">Simple tools for products, stock, and orders.</p>
-      <p className="admin-subtle">Pick one task and finish it quickly.</p>
+      <h1>Store dashboard</h1>
+      <p className="admin-lead">Add products, fix stock, check orders — one calm screen at a time.</p>
+      <p className="admin-subtle">Choose a task below. You can always come back to Home.</p>
 
       <section className="sectionCard sectionCardMuted">
-        <h2>At a Glance</h2>
-        <p className="admin-note-tight">
-          Key numbers first, then jump to what you need.
-        </p>
+        <h2>At a glance</h2>
+        <p className="admin-note-tight">A quick snapshot of your catalog. Tap a tab when you are ready.</p>
         <div className="admin-orders-stats" role="status" aria-label="Store summary">
           <p className="admin-orders-stat">
             <strong>{productCounts.total}</strong>
@@ -1118,14 +1192,14 @@ export default function AdminPage() {
               className={`admin-mode-toggle ${adminView === "add" ? "is-active" : ""}`}
               onClick={() => setAdminView("add")}
             >
-              Add item
+              New product
             </button>
             <button
               type="button"
               className={`admin-mode-toggle ${adminView === "manage" ? "is-active" : ""}`}
               onClick={() => setAdminView("manage")}
             >
-              Manage items
+              Edit products
             </button>
             <button
               type="button"
@@ -1142,7 +1216,7 @@ export default function AdminPage() {
           <p className="admin-note-tight">Log in to access product and order tools.</p>
         )}
         <p className="admin-note-tight">
-          Orders are handled in a separate queue at <a href="/admin/orders">/admin/orders</a>.
+          <strong>Orders</strong> live on a separate page — use the Orders tab or link above.
         </p>
       </section>
 
@@ -1192,6 +1266,27 @@ export default function AdminPage() {
                 onClick={() => {
                   void loadProducts();
                   void loadShippingConfiguration();
+                  if (token) {
+                    setNewsletterBusy(true);
+                    void (async () => {
+                      try {
+                        const headers = new Headers();
+                        headers.set("Authorization", `Bearer ${token}`);
+                        const response = await fetch(
+                          "/api/admin/newsletter/subscribers?limit=500",
+                          { headers }
+                        );
+                        const json = (await response.json().catch(() => ({}))) as {
+                          items?: Array<{ email: string; created_at: string; source: string }>;
+                        };
+                        if (response.ok && Array.isArray(json.items)) {
+                          setNewsletterItems(json.items);
+                        }
+                      } finally {
+                        setNewsletterBusy(false);
+                      }
+                    })();
+                  }
                 }}
                 disabled={loadingProducts || loadingShipping}
               >
@@ -1214,14 +1309,14 @@ export default function AdminPage() {
                 className={`admin-mode-toggle ${adminView === "add" ? "is-active" : ""}`}
                 onClick={() => setAdminView("add")}
               >
-                Add item
+                New product
               </button>
               <button
                 type="button"
                 className={`admin-mode-toggle ${adminView === "manage" ? "is-active" : ""}`}
                 onClick={() => setAdminView("manage")}
               >
-                Manage items
+                Edit products
               </button>
               <button
                 type="button"
@@ -1234,33 +1329,124 @@ export default function AdminPage() {
           </section>
 
           {adminView === "home" ? (
-            <section className="sectionCard">
-              <h2>What Would You Like To Do?</h2>
-              <p className="admin-note">
-                Pick one path and keep things focused.
-              </p>
-              <div className="actionGrid">
-                <button type="button" className="admin-primary-action" onClick={() => setAdminView("add")}>
-                  Add new item
-                </button>
-                <button type="button" onClick={() => setAdminView("manage")}>
-                  Manage existing items
-                </button>
-                <button type="button" onClick={() => setAdminView("shipping")}>
-                  Shipping settings
-                </button>
-                <a href="/admin/orders" className="toolbarLink">
-                  Open order list
-                </a>
-              </div>
-            </section>
+            <>
+              <section className="sectionCard admin-home-hero">
+                <h2>What do you want to do?</h2>
+                <p className="admin-note">Large buttons, small decisions — tap one.</p>
+                <p className="admin-subtle admin-home-analytics-status">
+                  Analytics:{" "}
+                  <strong>
+                    {process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN?.trim() ? "On" : "Off"}
+                  </strong>{" "}
+                  <span className="admin-subtle">
+                    (Cloudflare Web Analytics)
+                  </span>
+                </p>
+                <ul className="admin-setup-checklist" aria-label="Setup checklist">
+                  <li
+                    className={`admin-setup-item ${
+                      process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN?.trim()
+                        ? "is-ok"
+                        : "is-warn"
+                    }`}
+                  >
+                    <strong>Analytics</strong>
+                    <span>
+                      {process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN?.trim()
+                        ? "On"
+                        : "Off (optional)"}
+                    </span>
+                  </li>
+                  <li
+                    className={`admin-setup-item ${
+                      process.env.PAYPAL_WEBHOOK_ID?.trim() ? "is-ok" : "is-warn"
+                    }`}
+                  >
+                    <strong>PayPal webhook verification</strong>
+                    <span>
+                      {process.env.PAYPAL_WEBHOOK_ID?.trim()
+                        ? "On"
+                        : "Off (set PAYPAL_WEBHOOK_ID in production)"}
+                    </span>
+                  </li>
+                  <li
+                    className={`admin-setup-item ${
+                      newsletterBusy
+                        ? "is-warn"
+                        : newsletterItems.length > 0
+                          ? "is-ok"
+                          : "is-warn"
+                    }`}
+                  >
+                    <strong>Email list</strong>
+                    <span>
+                      {newsletterBusy
+                        ? "Loading…"
+                        : newsletterItems.length > 0
+                          ? "Collecting"
+                          : "No signups yet (ok)"}
+                    </span>
+                  </li>
+                  <li className="admin-setup-item is-ok">
+                    <strong>Shipping</strong>
+                    <span>Configured in this admin</span>
+                  </li>
+                </ul>
+                <div className="actionGrid admin-hub-grid">
+                  <button
+                    type="button"
+                    className="admin-primary-action admin-hub-action"
+                    onClick={() => setAdminView("add")}
+                  >
+                    New product
+                  </button>
+                  <button type="button" className="admin-hub-action" onClick={() => setAdminView("manage")}>
+                    Edit products (price, photos, stock)
+                  </button>
+                  <button type="button" className="admin-hub-action" onClick={() => setAdminView("shipping")}>
+                    Shipping rates
+                  </button>
+                  <a href="/admin/orders" className="toolbarLink admin-hub-action">
+                    Orders
+                  </a>
+                </div>
+              </section>
+
+              <section className="sectionCard admin-newsletter-panel">
+                <h2>Email list (restocks &amp; news)</h2>
+                <p className="admin-note-tight">
+                  Shoppers can join from your website footer. Copy the list into Mailchimp, Flodesk,
+                  Kit, or any tool you like for newsletters.
+                </p>
+                <p className="admin-orders-stat admin-newsletter-stat">
+                  <strong>{newsletterBusy ? "…" : newsletterItems.length}</strong>
+                  <span>subscribers {newsletterBusy ? "(loading)" : "(showing up to 500)"}</span>
+                </p>
+                <div className="actionGrid actionGridTight">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadNewsletterCsv()}
+                    disabled={newsletterBusy || newsletterItems.length === 0}
+                  >
+                    Download CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyNewsletterEmails()}
+                    disabled={newsletterBusy || newsletterItems.length === 0}
+                  >
+                    Copy all emails
+                  </button>
+                </div>
+              </section>
+            </>
           ) : null}
 
           {adminView === "add" ? (
             <section className="sectionCard" id="add-item">
-            <h2>Add Item</h2>
+            <h2>New product</h2>
             <p className="admin-note">
-              Quick setup: name, price, stock, then publish when ready.
+              Start with name and price — you can add photos and publish in the next step.
             </p>
             <form onSubmit={handleCreateProduct} className="formGrid createForm">
               <label>

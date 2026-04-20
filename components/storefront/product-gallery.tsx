@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 
 type ProductGalleryImage = {
   id: string;
@@ -32,7 +33,10 @@ function toGalleryImages(productName: string, images: ProductGalleryImage[]): Ga
 }
 
 export function ProductGallery({ productName, images }: ProductGalleryProps) {
-  const galleryImages = toGalleryImages(productName, images);
+  const galleryImages = useMemo(
+    () => toGalleryImages(productName, images),
+    [productName, images]
+  );
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
@@ -53,7 +57,14 @@ export function ProductGallery({ productName, images }: ProductGalleryProps) {
   return (
     <div className="product-gallery">
       <div className="product-main-frame">
-        <img src={activeImage.url} alt={activeImage.alt} className="product-main-image" />
+        <Image
+          src={activeImage.url}
+          alt={activeImage.alt}
+          fill
+          priority={selectedIndex === 0}
+          sizes="(max-width: 900px) 100vw, min(520px, 45vw)"
+          className="product-main-image"
+        />
       </div>
 
       {galleryImages.length > 1 ? (
@@ -69,7 +80,14 @@ export function ProductGallery({ productName, images }: ProductGalleryProps) {
                   aria-label={`Show product image ${index + 1}`}
                   aria-pressed={isActive}
                 >
-                  <img src={image.url} alt={image.alt} className="product-thumb-image" />
+                  <Image
+                    src={image.url}
+                    alt={image.alt}
+                    width={160}
+                    height={90}
+                    sizes="90px"
+                    className="product-thumb-image"
+                  />
                 </button>
               </li>
             );

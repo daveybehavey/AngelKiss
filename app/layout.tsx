@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Allura, Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
+import Link from "next/link";
+import { CloudflareWebAnalyticsHead } from "@/components/analytics/cloudflare-web-analytics";
 import { CartProvider } from "@/components/storefront/cart-provider";
 import { CartNavLink } from "@/components/storefront/cart-nav-link";
+import { NewsletterSignup } from "@/components/storefront/newsletter-signup";
 import "./globals.css";
 
 const fontDisplay = Cormorant_Garamond({
@@ -33,23 +36,58 @@ const metadataBase = (() => {
   }
 })();
 
+const siteDescription =
+  "Handmade crochet gifts, ready-made designs, and made-to-order custom sublimation prints.";
+
 export const metadata: Metadata = {
   metadataBase,
   title: {
     default: "AnglKiss Creations",
     template: "%s | AnglKiss Creations"
   },
-  description:
-    "Handmade crochet gifts, ready-made designs, and made-to-order custom sublimation prints.",
+  description: siteDescription,
   alternates: {
     canonical: "/"
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_CA",
+    url: metadataBase,
+    siteName: "AnglKiss Creations",
+    title: "AnglKiss Creations",
+    description: siteDescription
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AnglKiss Creations",
+    description: siteDescription
+  },
+  robots: {
+    index: true,
+    follow: true
   }
+};
+
+const storeJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "OnlineStore",
+  name: "AnglKiss Creations",
+  description: siteDescription,
+  url: metadataBase.origin,
+  areaServed: ["CA", "US"]
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${fontDisplay.variable} ${fontLogo.variable} ${fontBody.variable}`}>
+      <head>
+        <CloudflareWebAnalyticsHead />
+      </head>
       <body className="font-body">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(storeJsonLd) }}
+        />
         <CartProvider>
           <div className="site-root">
             <a className="skip-link" href="#main-content">
@@ -57,13 +95,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </a>
             <header className="site-header">
               <div className="site-wrap site-header-inner">
-                <a className="brand-link" href="/">
+                <Link className="brand-link" href="/">
                   AnglKiss Creations
-                </a>
+                </Link>
                 <nav className="site-nav" aria-label="Main navigation">
-                  <a href="/shop">Shop</a>
+                  <Link href="/shop">Shop</Link>
                   <CartNavLink />
-                  <a href="/checkout">Checkout</a>
+                  <Link href="/checkout">Checkout</Link>
                 </nav>
               </div>
             </header>
@@ -83,15 +121,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <h2 className="site-footer-title">Shop</h2>
                   <ul className="site-footer-links">
                     <li>
-                      <a href="/shop">All Products</a>
+                      <Link href="/shop">All Products</Link>
                     </li>
                     <li>
-                      <a href="/shop?category=custom_sublimation">Custom-Printed</a>
+                      <Link href="/shop?category=custom_sublimation">Custom-Printed</Link>
                     </li>
                     <li>
-                      <a href="/shop?category=handmade_crochet_knit">Crochet & Knit</a>
+                      <Link href="/shop?category=handmade_crochet_knit">Crochet & Knit</Link>
                     </li>
                   </ul>
+                </section>
+                <section className="site-footer-column site-footer-newsletter">
+                  <NewsletterSignup headingId="footer-newsletter-heading" />
                 </section>
                 <section className="site-footer-column">
                   <h2 className="site-footer-title">Contact</h2>
@@ -105,10 +146,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <p>Shipping available across Canada and the USA.</p>
                   <ul className="site-footer-links">
                     <li>
-                      <a href="/shipping">Shipping Policy</a>
+                      <Link href="/shipping">Shipping Policy</Link>
                     </li>
                     <li>
-                      <a href="/returns">Returns &amp; Refunds</a>
+                      <Link href="/returns">Returns &amp; Refunds</Link>
+                    </li>
+                    <li>
+                      <Link href="/privacy">Privacy Policy</Link>
                     </li>
                   </ul>
                 </section>

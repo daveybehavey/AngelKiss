@@ -2,6 +2,7 @@
 
 import { useCart } from "@/components/storefront/cart-provider";
 import { lineTotalCents } from "@/lib/storefront/cart";
+import Link from "next/link";
 
 function formatMoney(cents: number, currency: string): string {
   return `${(cents / 100).toFixed(2)} ${currency}`;
@@ -35,17 +36,17 @@ export default function CartPage() {
           Shipping is calculated after you enter your address at checkout.
         </p>
         <p className="page-link-row">
-          <a href="/shop">Continue shopping</a>
-          <a href="/checkout">Checkout</a>
+          <Link href="/shop">Continue shopping</Link>
+          <Link href="/checkout">Checkout</Link>
         </p>
       </section>
 
       {items.length === 0 ? (
         <section className="panel cart-empty">
           <p>Your cart is empty for now.</p>
-          <a href="/shop" className="btn btn-primary">
+          <Link href="/shop" className="btn btn-primary">
             Browse products
-          </a>
+          </Link>
         </section>
       ) : (
         <>
@@ -59,7 +60,7 @@ export default function CartPage() {
                 <li key={item.cart_item_id} className="panel cart-item">
                   <div className="cart-item-details">
                     <p className="cart-item-name">
-                      <a href={`/shop/${item.slug}`}>{item.name}</a>
+                      <Link href={`/shop/${item.slug}`}>{item.name}</Link>
                     </p>
                     <p className="cart-item-meta">
                       Unit: {formatMoney(item.unit_price_cents, item.currency)}
@@ -126,9 +127,9 @@ export default function CartPage() {
               <strong>{formatMoney(subtotalCents, currency)}</strong>
             </p>
             <div className="cart-summary-actions">
-              <a href="/checkout" className="btn btn-primary">
+              <Link href="/checkout" className="btn btn-primary">
                 Continue to secure checkout
-              </a>
+              </Link>
               <button type="button" className="btn btn-outline" onClick={clearCart}>
                 Clear cart
               </button>

@@ -9,6 +9,39 @@ Logic-first MVP scaffold for:
 - Node.js 20+
 - A Supabase project
 
+## One-command local setup
+From the repo root (after you have a Supabase project and PayPal sandbox keys):
+
+```bash
+npm run setup
+```
+
+That installs dependencies, creates `.env.local` from `.env.example` if missing, and checks required variables.
+
+After `.env.local` is filled in, apply the newsletter table to production (idempotent) with:
+
+```bash
+npm run setup:newsletter
+```
+
+To apply SQL migrations to your **hosted** Supabase database (uses `SUPABASE_DB_PASSWORD` + project ref from `NEXT_PUBLIC_SUPABASE_URL`):
+
+```bash
+npm run db:push
+```
+
+If `db:push` reports **migration history mismatch** (remote was created or repaired outside this repo), either fix history with [`supabase migration repair`](https://supabase.com/docs/reference/cli/supabase-migration-repair) / `supabase db pull`, or apply a specific file against the hosted database:
+
+```bash
+npm run db:newsletter
+```
+
+For any SQL file under `supabase/migrations/`:
+
+```bash
+npm run db:sql -- supabase/migrations/202604020001_add_order_shipping_tracking_columns.sql
+```
+
 ## Environment
 Copy `.env.example` to `.env.local` and set:
 - `NEXT_PUBLIC_SUPABASE_URL`
@@ -17,18 +50,27 @@ Copy `.env.example` to `.env.local` and set:
 - `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`)
 - optional `SUPABASE_PRODUCT_IMAGES_BUCKET` (default `product-images`)
 - optional `SUPABASE_CUSTOM_UPLOADS_BUCKET` (default `customer-design-uploads`)
-- optional `PAYPAL_WEBHOOK_ID`
+- `PAYPAL_WEBHOOK_ID` (optional in local dev; **set in production** so `/api/webhooks/paypal` verifies events with PayPal before processing)
 - `PAYPAL_ENV` (`sandbox` or `live`)
 - `PAYPAL_CLIENT_ID`
 - `PAYPAL_CLIENT_SECRET`
 - optional aliases: `PAYPAL_TEST_CLIENT_ID`, `PAYPAL_TEST_CLIENT_SECRET`
 - `NEXT_PUBLIC_PAYPAL_CLIENT_ID`
+- optional `NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` (free Cloudflare Web Analytics “Site token”)
+- optional `SUPABASE_DB_PASSWORD` (only for `npm run db:push`; find under Supabase → Settings → Database)
+
+### Analytics (free)
+This project is wired for **Cloudflare Web Analytics** (free). To enable it:
+1. In Cloudflare Dashboard → **Analytics & Logs → Web Analytics**, create/select your site and copy the **Site token**.
+2. Set `NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` in your production environment (Cloudflare Workers env vars / Wrangler secrets or vars).
+3. Deploy the site, then check Cloudflare Web Analytics realtime/overview.
 
 ## Database
 Run SQL migrations in `supabase/migrations/` in order:
 1. `202603280001_initial_schema.sql`
 2. `202603280002_shipping_matrix_and_checkout_logic.sql`
 3. `202603280003_checkout_and_paypal_functions.sql`
+4. Later dated files in chronological order (for example `202603310001_*`, `202603310002_*`, `202603310003_*`, `202604020001_*`, `202604130001_newsletter_subscribers.sql`)
 
 ## Run
 ```bash
@@ -48,6 +90,28 @@ Open:
 - `npm run typecheck`
 - `npm run test`
 - `npm run build`
+
+Windows + OneDrive note: if `npm run build` fails with a `readlink` / `EINVAL` error, run:
+- `npm run build:clean`
+
+### Optional: run builds/deploys through WSL automatically (Windows)
+If you want OpenNext/Next builds to run in Linux (more reliable than Windows + OneDrive), use:
+- `npm run wsl:test`
+- `npm run wsl:build`
+- `npm run wsl:deploy`
+
+These copy the repo from `/mnt/c/Users/david/OneDrive/Desktop/AngelKiss` into `~/code/AngelKiss` inside WSL (first run only), then run the command there.
+
+Optional (recommended inside Ubuntu): install `rsync` for faster syncs between Windows checkout and `~/code/AngelKiss`:
+```bash
+sudo apt-get update && sudo apt-get install -y rsync
+```
+
+### Recommended Windows workflow (code on Windows, ship reliably)
+- **Local dev (Windows):** `npm run dev`
+- **Sanity check toolchain:** `npm run doctor`
+- **Production-ish build when WSL is installed:** `npm run build:win` (auto-routes through WSL)
+- **Deploy:** `npm run deploy` (auto-routes through WSL on Windows when `wsl.exe` exists)
 
 Optional mobile viewport overflow check (requires local dev server running):
 - `npm run qa:mobile`
@@ -73,6 +137,13 @@ npm run preview
 ### Deploy to Cloudflare Workers
 ```bash
 npm run deploy
+```
+
+Notes:
+- On **Windows**, `npm run deploy` will automatically run through **WSL** when `wsl.exe` exists (recommended for OpenNext + OneDrive reliability).
+- If you need a plain Windows deploy path (or WSL isn’t set up yet), run:
+```bash
+npm run deploy:clean
 ```
 
 ### Optional type generation for Worker env
@@ -127,3 +198,5 @@ set role = excluded.role;
 - `POST /api/checkout/sessions/:id/paypal-order/capture`
 - `POST /api/checkout/sessions/:id/cancel`
 - `POST /api/webhooks/paypal`
+- `POST /api/newsletter/subscribe`
+- `GET /api/admin/newsletter/subscribers`

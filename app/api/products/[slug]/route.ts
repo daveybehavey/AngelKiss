@@ -22,7 +22,15 @@ export async function GET(
       return notFound("Product not found");
     }
 
-    return NextResponse.json({ product }, { status: 200 });
+    return NextResponse.json(
+      { product },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120"
+        }
+      }
+    );
   } catch (error) {
     return serverError("Unexpected error loading public product", error instanceof Error ? error.message : error);
   }

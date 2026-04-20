@@ -1,7 +1,9 @@
-# AngelKiss MVP Build Spec (Logic-First)
+# AnglKiss Creations MVP Build Spec (Logic-First)
+
+Repository codename **AngelKiss**; customer-facing brand **AnglKiss Creations**.
 
 ## 1) Frozen MVP Decisions
-- Stack: Next.js (App Router) + Supabase (Postgres/Auth/Storage) + PayPal + react-konva.
+- Stack: Next.js (App Router) + Supabase (Postgres/Auth/Storage) + PayPal.
 - Product categories:
   - `custom_sublimation`
   - `handmade_crochet_knit`
@@ -94,28 +96,17 @@ Allowed transitions:
 - `payment_failed` is terminal.
 - `refunded` is terminal.
 
-## 4) Customizer v1 (No Styling Scope)
-Required functional capabilities:
-- Upload one customer image asset.
-- Add/edit/remove text layers.
-- Drag text layers.
-- Resize text layers.
-- Set font family and text color from whitelist.
-- Export preview image (PNG) for order snapshot.
+## 4) Customization (Phase 1 — shipped)
 
-Customizer payload persisted on checkout/order item:
-- `uploaded_image_path`
-- `canvas_width`, `canvas_height`
-- `safe_area` object (`x`, `y`, `width`, `height`)
-- `text_layers[]` with:
-  - `id`, `text`
-  - `x`, `y`, `width`, `height`
-  - `font_family`, `font_size`, `color`
-  - `align`
-- `preview_image_path`
+**Phase 1 (MVP storefront):** For `custom_sublimation` products, the customer flow is **signed image upload** to Supabase Storage plus optional **notes** and **rights confirmation** (no in-browser canvas editor).
+
+- Upload URL: `POST /api/products/:slug/customization/upload-url` (see `docs/api-contracts.md`).
+- Checkout validates customization with `lib/checkout/customization.ts` (Zod): `upload` metadata, `rights_acknowledged`, optional `customer_notes`.
+
+**Phase 2 (optional / future):** In-browser layout (`react-konva` or similar): text layers, drag/resize, safe-area preview, exported `preview_image_path`. Not required for launch if Phase 1 meets fulfillment workflow.
 
 ## 5) Checkout + Payment Flow (MVP)
-1. Client creates checkout session with item snapshots and customizer payload.
+1. Client creates checkout session with item snapshots and per-item `customization` (Phase 1 shape from `lib/checkout/customization.ts`).
 2. Checkout reservation timeout is 30 minutes (best-practice default for MVP).
 3. For `finite` inventory items, server reserves quantity (`reserved_quantity += qty`).
 4. For `finite` inventory items, no backorders are allowed.
@@ -156,4 +147,4 @@ Customizer payload persisted on checkout/order item:
 ## 7) Day 1 Deliverables (This Spec + Contracts)
 - Frozen domain model and status machine.
 - Supabase migration for core tables/enums/constraints.
-- API contract list for admin/storefront/customizer/checkout/webhook.
+- API contract list for admin/storefront/customization upload/checkout/webhook.

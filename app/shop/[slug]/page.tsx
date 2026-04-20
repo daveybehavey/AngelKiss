@@ -1,14 +1,12 @@
-import { getPublicProductBySlug } from "@/lib/storefront/products";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { AddToCartPanel } from "@/components/storefront/add-to-cart-panel";
 import { ProductGallery } from "@/components/storefront/product-gallery";
+import { formatStorefrontMoney } from "@/lib/storefront/product-display";
+import { getPublicProductBySlugCached } from "@/lib/storefront/get-public-product-cached";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-
-function formatMoney(cents: number, currency: string): string {
-  return `${(cents / 100).toFixed(2)} ${currency}`;
-}
 
 function getInventoryStatusText(
   inventoryMode: "finite" | "made_to_order",
@@ -36,14 +34,58 @@ function getInventoryStatusTone(
   return "is-in-stock";
 }
 
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const normalized = slug.trim().toLowerCase();
+  if (!normalized) {
+    return { title: "Product" };
+  }
+
+  try {
+    const product = await getPublicProductBySlugCached(normalized);
+    if (!product) {
+      return {
+        title: "Product not found",
+        robots: { index: false, follow: true }
+      };
+    }
+
+    const description =
+      product.short_description?.trim() ||
+      product.long_description?.trim().slice(0, 160) ||
+      `Shop ${product.name} at AnglKiss Creations.`;
+
+    return {
+      title: product.name,
+      description,
+      openGraph: {
+        title: product.name,
+        description,
+        type: "website"
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: product.name,
+        description
+      }
+    };
+  } catch {
+    return { title: "Product" };
+  }
+}
+
 export default async function ProductPage({
   params
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = getSupabaseAdminClient();
-  const product = await getPublicProductBySlug(supabase, slug);
+  const normalizedSlug = slug.trim().toLowerCase();
+  const product = await getPublicProductBySlugCached(normalizedSlug);
 
   if (!product) {
     notFound();
@@ -52,9 +94,9 @@ export default async function ProductPage({
   return (
     <main className="page-main product-page">
       <p className="product-back-row">
-        <a href="/shop" className="product-back-link">
+        <Link href="/shop" className="product-back-link">
           Back to shop
-        </a>
+        </Link>
       </p>
 
       <section className="panel product-layout">
@@ -63,7 +105,7 @@ export default async function ProductPage({
         <div className="product-summary">
           <h1 className="product-title">{product.name}</h1>
           <p className="product-price">
-            {formatMoney(product.base_price_cents, product.currency)}
+            {formatStorefrontMoney(product.base_price_cents, product.currency)}
           </p>
           <p
             className={`product-stock-pill ${getInventoryStatusTone(
@@ -86,20 +128,14 @@ export default async function ProductPage({
           {product.category === "handmade_crochet_knit" && product.handmade_details ? (
             <div className="product-detail-card">
               <h2>Handmade Details</h2>
-              <p>
-                Material: {product.handmade_details.material}
-              </p>
-              <p>
-                Lead time: {product.handmade_details.lead_time_days} days
-              </p>
+              <p>Material: {product.handmade_details.material}</p>
+              <p>Lead time: {product.handmade_details.lead_time_days} days</p>
               <p>
                 Personalization:{" "}
                 {product.handmade_details.personalization_available ? "Yes" : "No"}
               </p>
               {product.handmade_details.care_instructions ? (
-                <p>
-                  Care instructions: {product.handmade_details.care_instructions}
-                </p>
+                <p>Care instructions: {product.handmade_details.care_instructions}</p>
               ) : null}
             </div>
           ) : null}
@@ -113,13 +149,9 @@ export default async function ProductPage({
                   ? "Custom photo upload"
                   : "Ready-made design by AnglKiss Creations"}
               </p>
-              <p>
-                Blank color: {product.custom_sublimation_details.default_blank_color}
-              </p>
+              <p>Blank color: {product.custom_sublimation_details.default_blank_color}</p>
               {product.custom_sublimation_details.allow_image_upload ? (
-                <p>
-                  Max upload size: {product.custom_sublimation_details.max_upload_mb} MB
-                </p>
+                <p>Max upload size: {product.custom_sublimation_details.max_upload_mb} MB</p>
               ) : null}
               <p>
                 Text overlay:{" "}

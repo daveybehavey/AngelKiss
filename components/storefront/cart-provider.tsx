@@ -12,6 +12,7 @@ import {
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -143,52 +144,55 @@ export function CartProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [hydrated, items]);
 
-  function addItem(
-    item: Omit<CartItem, "quantity" | "cart_item_id">,
-    quantity = 1,
-    options?: { forceNewLine?: boolean }
-  ) {
-    const safeQuantity = clampCartQuantity(quantity);
+  const addItem = useCallback(
+    (
+      item: Omit<CartItem, "quantity" | "cart_item_id">,
+      quantity = 1,
+      options?: { forceNewLine?: boolean }
+    ) => {
+      const safeQuantity = clampCartQuantity(quantity);
 
-    setItems((current) => {
-      const forceNewLine = options?.forceNewLine === true;
-      const nextCustomizationSignature = customizationSignature(item.customization ?? {});
-      const existing = forceNewLine
-        ? null
-        : current.find(
-            (entry) =>
-              entry.product_id === item.product_id &&
-              customizationSignature(entry.customization ?? {}) ===
-                nextCustomizationSignature
-          );
-      if (!existing) {
-        return [
-          ...current,
-          { ...item, cart_item_id: createCartItemId(), quantity: safeQuantity }
-        ];
-      }
-
-      return current.map((entry) => {
-        if (entry.cart_item_id !== existing.cart_item_id) {
-          return entry;
+      setItems((current) => {
+        const forceNewLine = options?.forceNewLine === true;
+        const nextCustomizationSignature = customizationSignature(item.customization ?? {});
+        const existing = forceNewLine
+          ? null
+          : current.find(
+              (entry) =>
+                entry.product_id === item.product_id &&
+                customizationSignature(entry.customization ?? {}) ===
+                  nextCustomizationSignature
+            );
+        if (!existing) {
+          return [
+            ...current,
+            { ...item, cart_item_id: createCartItemId(), quantity: safeQuantity }
+          ];
         }
 
-        return {
-          ...entry,
-          quantity: clampCartQuantity(entry.quantity + safeQuantity),
-          unit_price_cents: item.unit_price_cents,
-          currency: item.currency,
-          image_url: item.image_url,
-          image_alt: item.image_alt,
-          customization: item.customization ?? {}
-        };
+        return current.map((entry) => {
+          if (entry.cart_item_id !== existing.cart_item_id) {
+            return entry;
+          }
+
+          return {
+            ...entry,
+            quantity: clampCartQuantity(entry.quantity + safeQuantity),
+            unit_price_cents: item.unit_price_cents,
+            currency: item.currency,
+            image_url: item.image_url,
+            image_alt: item.image_alt,
+            customization: item.customization ?? {}
+          };
+        });
       });
-    });
 
-    setLastAddedAt(Date.now());
-  }
+      setLastAddedAt(Date.now());
+    },
+    []
+  );
 
-  function setItemQuantity(cartItemId: string, quantity: number) {
+  const setItemQuantity = useCallback((cartItemId: string, quantity: number) => {
     const rounded = Math.round(quantity);
     if (rounded <= 0) {
       setItems((current) =>
@@ -206,35 +210,50 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return { ...entry, quantity: safeQuantity };
       })
     );
-  }
+  }, []);
 
-  function removeItem(cartItemId: string) {
+  const removeItem = useCallback((cartItemId: string) => {
     setItems((current) =>
       current.filter((entry) => entry.cart_item_id !== cartItemId)
     );
-  }
+  }, []);
 
-  function clearCart() {
+  const clearCart = useCallback(() => {
     setItems([]);
-  }
+  }, []);
 
   const itemCount = useMemo(() => cartItemCount(items), [items]);
   const subtotalCents = useMemo(() => cartSubtotalCents(items), [items]);
   const currency = items[0]?.currency ?? "USD";
 
+  const contextValue = useMemo(
+    () => ({
+      items,
+      itemCount,
+      lastAddedAt,
+      subtotalCents,
+      currency,
+      addItem,
+      setItemQuantity,
+      removeItem,
+      clearCart
+    }),
+    [
+      items,
+      itemCount,
+      lastAddedAt,
+      subtotalCents,
+      currency,
+      addItem,
+      setItemQuantity,
+      removeItem,
+      clearCart
+    ]
+  );
+
   return (
     <CartContext.Provider
-      value={{
-        items,
-        itemCount,
-        lastAddedAt,
-        subtotalCents,
-        currency,
-        addItem,
-        setItemQuantity,
-        removeItem,
-        clearCart
-      }}
+      value={contextValue}
     >
       {children}
     </CartContext.Provider>

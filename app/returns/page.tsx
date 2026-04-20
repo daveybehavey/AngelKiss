@@ -2,7 +2,17 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Returns & Refunds",
-  description: "Returns and refund policy for AnglKiss Creations."
+  description: "Returns and refund policy for AnglKiss Creations.",
+  openGraph: {
+    title: "Returns & Refunds | AnglKiss Creations",
+    description: "How returns work and when refunds apply.",
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title: "Returns & Refunds | AnglKiss Creations",
+    description: "Return windows, shipping costs, and refund expectations."
+  }
 };
 
 export default function ReturnsPolicyPage() {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCart } from "@/components/storefront/cart-provider";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export function CartNavLink() {
@@ -22,7 +23,7 @@ export function CartNavLink() {
   }, [lastAddedAt]);
 
   return (
-    <a
+    <Link
       href="/cart"
       className="site-nav-cart-link"
       aria-label={itemCount > 0 ? `Cart, ${itemCount} ${itemLabel}` : "Cart"}
@@ -33,6 +34,6 @@ export function CartNavLink() {
           {itemCount}
         </span>
       ) : null}
-    </a>
+    </Link>
   );
 }

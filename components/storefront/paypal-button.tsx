@@ -18,7 +18,11 @@ export type PayPalCaptureSuccess = {
   paypalStatus: string;
   finalized: boolean;
   orderId: string | null;
+  /** Store-facing sequential order # from `orders.order_number`, when available */
+  orderNumber: string | null;
   message: string | null;
+  /** True when the session was already completed (e.g. refresh after success) */
+  alreadyCompleted?: boolean;
 };
 
 type PayPalButtonProps = {
@@ -111,14 +115,29 @@ export function PayPalButton({ checkoutSessionId, onSuccess }: PayPalButtonProps
             const response = await fetch(`/api/checkout/sessions/${checkoutSessionId}/paypal-order/capture`, {
               method: "POST"
             });
-            const payload = (await response.json().catch(() => ({}))) as PayPalCaptureSuccess & { error?: string };
+            const raw = (await response.json().catch(() => ({}))) as Record<string, unknown> & {
+              error?: string;
+            };
 
             if (!response.ok) {
-              setError(payload.error ?? "Failed to capture payment");
+              setError(
+                typeof raw.error === "string" ? raw.error : "Failed to capture payment"
+              );
               return;
             }
 
-            onSuccess(payload);
+            const normalized: PayPalCaptureSuccess = {
+              checkoutSessionId: String(raw.checkoutSessionId ?? ""),
+              paypalOrderId: String(raw.paypalOrderId ?? ""),
+              paypalStatus: String(raw.paypalStatus ?? ""),
+              finalized: Boolean(raw.finalized),
+              orderId: typeof raw.orderId === "string" ? raw.orderId : null,
+              orderNumber: typeof raw.orderNumber === "string" ? raw.orderNumber : null,
+              message: typeof raw.message === "string" ? raw.message : null,
+              alreadyCompleted: raw.alreadyCompleted === true
+            };
+
+            onSuccess(normalized);
           },
           onError: (callbackError: unknown) => {
             setError(callbackError instanceof Error ? callbackError.message : "PayPal checkout failed");
