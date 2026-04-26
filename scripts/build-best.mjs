@@ -10,7 +10,7 @@ function npmCmd() {
 function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, {
     stdio: "inherit",
-    shell: false,
+    shell: platform() === "win32",
     ...opts
   });
   if (result.error) {
