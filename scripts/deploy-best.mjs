@@ -3,6 +3,10 @@ import { existsSync } from "node:fs";
 import { platform } from "node:os";
 import { resolve } from "node:path";
 
+function npmCmd() {
+  return platform() === "win32" ? "npm.cmd" : "npm";
+}
+
 function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, {
     stdio: "inherit",
@@ -53,5 +57,5 @@ if (platform() === "win32" && existsSync(ps) && isWslHealthy()) {
   ]);
 } else {
   console.log("deploy-best: using local npm (WSL unavailable)…");
-  run("npm", ["run", "deploy:clean"], { cwd: root });
+  run(npmCmd(), ["run", "deploy:clean"], { cwd: root });
 }
