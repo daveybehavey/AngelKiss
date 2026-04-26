@@ -13,6 +13,12 @@ export default async function HomePage() {
 
   return (
     <main className="page-main home-main">
+      <section className="home-ribbon" aria-label="Store note">
+        <p>
+          <strong>Cozy, gift-ready keepsakes</strong> — handmade in small batches. Custom photo
+          prints are made-to-order with care.
+        </p>
+      </section>
       <section className="panel home-hero">
         <div className="home-hero-ambient" aria-hidden="true">
           <span className="home-orb home-orb-a" />
@@ -66,6 +72,45 @@ export default async function HomePage() {
 
       <HomeFeaturedProducts items={featuredItems} />
 
+      <ScrollReveal as="section" className="panel home-signature" variant="fade-up" aria-label="A note from the maker">
+        <div className="home-signature-grid">
+          <div className="home-signature-note">
+            <p className="home-signature-kicker">A note from the maker</p>
+            <h2 className="home-signature-title">Little details matter here.</h2>
+            <p className="home-signature-copy">
+              Every listing is designed to feel personal—whether you’re choosing a one-of-a-kind
+              crochet piece or uploading a favorite photo for a custom print. If anything looks
+              unclear for printing, we’ll reach out before we make it.
+            </p>
+            <div className="button-row">
+              <Link
+                href="/shop?category=custom_sublimation&sublimation_mode=customer_upload"
+                className="btn btn-primary"
+              >
+                Make a custom photo gift
+              </Link>
+              <Link href="/shop?category=handmade_crochet_knit" className="btn btn-outline">
+                Shop handmade crochet
+              </Link>
+            </div>
+          </div>
+          <ol className="home-signature-steps" aria-label="Custom photo prints in 3 steps">
+            <li>
+              <strong>1) Upload</strong>
+              <p>Choose one photo and add any notes (names, colors, vibe).</p>
+            </li>
+            <li>
+              <strong>2) Checkout</strong>
+              <p>Pay securely with PayPal—mobile-friendly and quick.</p>
+            </li>
+            <li>
+              <strong>3) We make it</strong>
+              <p>We prep, print, and ship from Vancouver Island.</p>
+            </li>
+          </ol>
+        </div>
+      </ScrollReveal>
+
       <ScrollReveal
         as="section"
         className="home-value-strip"
@@ -89,6 +134,32 @@ export default async function HomePage() {
           <p className="home-value-title">Ships Across Canada & USA</p>
           <p className="home-value-copy">Shipping rates are shown at checkout by destination.</p>
         </article>
+      </ScrollReveal>
+
+      <ScrollReveal as="section" className="home-gift-finder" variant="fade-up" aria-label="Gift finder">
+        <div className="home-gift-finder-inner">
+          <div>
+            <p className="home-gift-finder-kicker">Gift finder</p>
+            <h2>Shop by “who is it for?”</h2>
+            <p className="home-gift-finder-copy">
+              A quick way to browse the cutest ideas—especially for custom photo keepsakes.
+            </p>
+          </div>
+          <div className="home-gift-finder-chips">
+            <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload" className="chip">
+              For couples 💞
+            </Link>
+            <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload" className="chip">
+              For parents 👨‍👩‍👧‍👦
+            </Link>
+            <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload" className="chip">
+              For pet lovers 🐾
+            </Link>
+            <Link href="/shop?category=handmade_crochet_knit" className="chip">
+              Cozy handmade 🧶
+            </Link>
+          </div>
+        </div>
       </ScrollReveal>
 
       <ScrollReveal as="div" className="home-collections-block" variant="fade-up">
