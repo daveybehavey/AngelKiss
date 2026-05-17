@@ -9,9 +9,12 @@ import {
   normalizePostalCodeInput,
   validateShippingOriginInput
 } from "@/lib/admin/shipping-validation";
+import { cancelCheckoutSession } from "@/lib/checkout/cancel-session";
+import { normalizePromoCodeInput } from "@/lib/checkout/promo";
 import { lineTotalCents, type CheckoutShippingAddress } from "@/lib/storefront/cart";
+import { formatShopperProductTitle } from "@/lib/storefront/product-display";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type CheckoutResult = {
   checkoutSessionId: string;
@@ -20,18 +23,19 @@ type CheckoutResult = {
   totals: {
     subtotal_cents: number;
     shipping_cents: number;
+    discount_cents?: number;
+    promo_code?: string | null;
     total_cents: number;
     shipping_zone: string;
     free_shipping_applied: boolean;
   };
 };
 
-type CountryCode = "CA" | "US";
+type CountryCode = "CA";
 type RegionOption = { code: string; label: string };
 
 const COUNTRY_OPTIONS: Array<{ code: CountryCode; label: string }> = [
-  { code: "CA", label: "Canada" },
-  { code: "US", label: "United States" }
+  { code: "CA", label: "Canada" }
 ];
 
 const REGION_OPTIONS: Record<CountryCode, RegionOption[]> = {
@@ -49,64 +53,11 @@ const REGION_OPTIONS: Record<CountryCode, RegionOption[]> = {
     { code: "QC", label: "Quebec" },
     { code: "SK", label: "Saskatchewan" },
     { code: "YT", label: "Yukon" }
-  ],
-  US: [
-    { code: "AL", label: "Alabama" },
-    { code: "AK", label: "Alaska" },
-    { code: "AZ", label: "Arizona" },
-    { code: "AR", label: "Arkansas" },
-    { code: "CA", label: "California" },
-    { code: "CO", label: "Colorado" },
-    { code: "CT", label: "Connecticut" },
-    { code: "DE", label: "Delaware" },
-    { code: "FL", label: "Florida" },
-    { code: "GA", label: "Georgia" },
-    { code: "HI", label: "Hawaii" },
-    { code: "ID", label: "Idaho" },
-    { code: "IL", label: "Illinois" },
-    { code: "IN", label: "Indiana" },
-    { code: "IA", label: "Iowa" },
-    { code: "KS", label: "Kansas" },
-    { code: "KY", label: "Kentucky" },
-    { code: "LA", label: "Louisiana" },
-    { code: "ME", label: "Maine" },
-    { code: "MD", label: "Maryland" },
-    { code: "MA", label: "Massachusetts" },
-    { code: "MI", label: "Michigan" },
-    { code: "MN", label: "Minnesota" },
-    { code: "MS", label: "Mississippi" },
-    { code: "MO", label: "Missouri" },
-    { code: "MT", label: "Montana" },
-    { code: "NE", label: "Nebraska" },
-    { code: "NV", label: "Nevada" },
-    { code: "NH", label: "New Hampshire" },
-    { code: "NJ", label: "New Jersey" },
-    { code: "NM", label: "New Mexico" },
-    { code: "NY", label: "New York" },
-    { code: "NC", label: "North Carolina" },
-    { code: "ND", label: "North Dakota" },
-    { code: "OH", label: "Ohio" },
-    { code: "OK", label: "Oklahoma" },
-    { code: "OR", label: "Oregon" },
-    { code: "PA", label: "Pennsylvania" },
-    { code: "RI", label: "Rhode Island" },
-    { code: "SC", label: "South Carolina" },
-    { code: "SD", label: "South Dakota" },
-    { code: "TN", label: "Tennessee" },
-    { code: "TX", label: "Texas" },
-    { code: "UT", label: "Utah" },
-    { code: "VT", label: "Vermont" },
-    { code: "VA", label: "Virginia" },
-    { code: "WA", label: "Washington" },
-    { code: "WV", label: "West Virginia" },
-    { code: "WI", label: "Wisconsin" },
-    { code: "WY", label: "Wyoming" },
-    { code: "DC", label: "District of Columbia" }
   ]
 };
 
-function normalizeCountryCode(value: string): CountryCode {
-  return normalizeCode(value) === "US" ? "US" : "CA";
+function normalizeCountryCode(_value: string): CountryCode {
+  return "CA";
 }
 
 function formatMoney(cents: number, currency: string): string {
@@ -121,6 +72,7 @@ export default function CheckoutPage() {
   const { items, itemCount, subtotalCents, currency, clearCart } = useCart();
 
   const [email, setEmail] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const [shippingAddress, setShippingAddress] = useState<CheckoutShippingAddress>({
     full_name: "",
     address_line1: "",
@@ -136,9 +88,20 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckoutResult | null>(null);
   const [paymentResult, setPaymentResult] = useState<PayPalCaptureSuccess | null>(null);
+  const activeCheckoutSessionRef = useRef<string | null>(null);
+  const paymentCompletedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      const sessionId = activeCheckoutSessionRef.current;
+      if (sessionId && !paymentCompletedRef.current) {
+        void cancelCheckoutSession(sessionId, "failed");
+      }
+    };
+  }, []);
 
   const normalizedCountryCode = normalizeCountryCode(shippingAddress.country_code);
-  const regionOptions = REGION_OPTIONS[normalizedCountryCode];
+  const regionOptions = REGION_OPTIONS.CA;
 
   const canSubmit = useMemo(() => {
     if (items.length === 0) {
@@ -169,8 +132,15 @@ export default function CheckoutPage() {
 
     setBusy(true);
     setError(null);
-    setResult(null);
     setPaymentResult(null);
+
+    const previousSessionId = activeCheckoutSessionRef.current;
+    if (previousSessionId) {
+      void cancelCheckoutSession(previousSessionId, "failed");
+      activeCheckoutSessionRef.current = null;
+    }
+
+    setResult(null);
 
     try {
       const shippingValidation = validateShippingOriginInput({
@@ -219,7 +189,10 @@ export default function CheckoutPage() {
             product_id: item.product_id,
             quantity: item.quantity,
             customization: item.customization ?? {}
-          }))
+          })),
+          ...(promoCode.trim()
+            ? { promo_code: normalizePromoCodeInput(promoCode) }
+            : {})
         })
       });
 
@@ -233,7 +206,9 @@ export default function CheckoutPage() {
         return;
       }
 
-      setResult(payload as CheckoutResult);
+      const checkout = payload as CheckoutResult;
+      activeCheckoutSessionRef.current = checkout.checkoutSessionId;
+      setResult(checkout);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unexpected checkout error");
     } finally {
@@ -243,11 +218,22 @@ export default function CheckoutPage() {
 
   const handlePaymentSuccess = useCallback(
     (payload: PayPalCaptureSuccess) => {
+      paymentCompletedRef.current = true;
+      activeCheckoutSessionRef.current = null;
       setPaymentResult(payload);
       clearCart();
     },
     [clearCart]
   );
+
+  const handlePaymentCancel = useCallback(() => {
+    const sessionId = activeCheckoutSessionRef.current;
+    if (sessionId) {
+      void cancelCheckoutSession(sessionId, "failed");
+    }
+    setResult(null);
+    activeCheckoutSessionRef.current = null;
+  }, []);
 
   return (
     <main className="page-main checkout-page">
@@ -283,7 +269,7 @@ export default function CheckoutPage() {
           {items.map((item) => (
             <li key={item.cart_item_id} className="checkout-item-row">
               <span>
-                {item.name} x {item.quantity}
+                {formatShopperProductTitle(item.name)} x {item.quantity}
               </span>
               <strong>{formatMoney(lineTotalCents(item), item.currency)}</strong>
             </li>
@@ -371,12 +357,9 @@ export default function CheckoutPage() {
               onChange={(event) =>
                 setShippingAddress((current) => ({
                   ...current,
-                  country_code: normalizeCountryCode(event.target.value),
-                  province_code: REGION_OPTIONS[normalizeCountryCode(event.target.value)][0]?.code ?? "",
-                  postal_code: normalizePostalCodeInput(
-                    normalizeCountryCode(event.target.value),
-                    current.postal_code
-                  )
+                  country_code: "CA",
+                  province_code: REGION_OPTIONS.CA[0]?.code ?? "",
+                  postal_code: normalizePostalCodeInput("CA", current.postal_code)
                 }))
               }
               disabled={busy}
@@ -442,7 +425,7 @@ export default function CheckoutPage() {
                 setShippingAddress((current) => ({
                   ...current,
                   postal_code: normalizePostalCodeInput(
-                    normalizeCountryCode(current.country_code),
+                    "CA",
                     event.target.value
                   )
                 }))
@@ -451,7 +434,7 @@ export default function CheckoutPage() {
                 setShippingAddress((current) => ({
                   ...current,
                   postal_code: normalizePostalCodeInput(
-                    normalizeCountryCode(current.country_code),
+                    "CA",
                     event.target.value
                   )
                 }))
@@ -459,9 +442,7 @@ export default function CheckoutPage() {
               disabled={busy}
             />
             <span className="form-hint">
-              {normalizedCountryCode === "CA"
-                ? "Canadian format: A1A 1A1"
-                : "US format: 12345 or 12345-6789"}
+              Canadian format: A1A 1A1
             </span>
           </label>
 
@@ -480,6 +461,22 @@ export default function CheckoutPage() {
                 }))
               }
               disabled={busy}
+            />
+          </label>
+
+          <label className="form-field">
+            Promo code (optional)
+            <input
+              className="field-control"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              enterKeyHint="done"
+              value={promoCode}
+              onChange={(event) => setPromoCode(event.target.value)}
+              onBlur={() => setPromoCode((current) => normalizePromoCodeInput(current))}
+              disabled={busy}
+              placeholder="e.g. ANGELTEST"
             />
           </label>
 
@@ -516,6 +513,15 @@ export default function CheckoutPage() {
             <span>Shipping</span>
             <strong>{formatMoney(result.totals.shipping_cents, currency)}</strong>
           </p>
+          {(result.totals.discount_cents ?? 0) > 0 ? (
+            <p className="summary-line">
+              <span>
+                Discount
+                {result.totals.promo_code ? ` (${result.totals.promo_code})` : ""}
+              </span>
+              <strong>-{formatMoney(result.totals.discount_cents ?? 0, currency)}</strong>
+            </p>
+          ) : null}
           <p className="summary-line">
             <span>Total</span>
             <strong>{formatMoney(result.totals.total_cents, currency)}</strong>
@@ -532,6 +538,7 @@ export default function CheckoutPage() {
             <PayPalButton
               checkoutSessionId={result.checkoutSessionId}
               onSuccess={handlePaymentSuccess}
+              onCancel={handlePaymentCancel}
             />
           ) : null}
 

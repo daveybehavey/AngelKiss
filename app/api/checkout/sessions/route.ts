@@ -3,9 +3,16 @@ import {
   type CheckoutProductRow,
   type CustomSublimationCheckoutDetails
 } from "@/lib/checkout/customization";
+import {
+  appendVariantToCustomization,
+  validateProductVariantSelection
+} from "@/lib/checkout/variant";
+import { listVariantsForProducts } from "@/lib/storefront/product-variants";
 import { badRequest, serverError } from "@/lib/http/json";
+import { assertStudioPrintCheckoutSelection } from "@/lib/storefront/studio-prints";
 import { getRequestMeta } from "@/lib/http/request-meta";
 import { logError, logWarn } from "@/lib/observability/log";
+import { expireStaleCheckoutSessions } from "@/lib/server/checkout-inventory";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -32,7 +39,8 @@ const checkoutBodySchema = z.object({
         customization: z.record(z.unknown()).optional()
       })
     )
-    .min(1)
+    .min(1),
+  promo_code: z.string().trim().max(40).optional()
 });
 
 type CheckoutItemInput = z.infer<typeof checkoutBodySchema>["items"][number];
@@ -51,8 +59,18 @@ export async function POST(request: Request) {
       return badRequest("Invalid request body", parsed.error.flatten());
     }
 
+    try {
+      await expireStaleCheckoutSessions();
+    } catch (expireError) {
+      logWarn("checkout.session.expire_stale_failed", {
+        ...requestMeta,
+        message: expireError instanceof Error ? expireError.message : String(expireError)
+      });
+    }
+
     const supabase = getSupabaseAdminClient();
-    const { customer_email, shipping_address, items } = parsed.data;
+    const { customer_email, shipping_address, items, promo_code: promoCodeRaw } = parsed.data;
+    const promo_code = promoCodeRaw?.trim() ? promoCodeRaw.trim() : undefined;
 
     const productIds = Array.from(new Set(items.map((item) => item.product_id)));
     const { data: productsData, error: productsError } = await supabase
@@ -69,6 +87,7 @@ export async function POST(request: Request) {
 
     const products = (productsData ?? []) as CheckoutProductRow[];
     const productById = new Map(products.map((product) => [product.id, product]));
+    const variantsByProduct = await listVariantsForProducts(supabase, productIds);
 
     const customSublimationProductIds = products
       .filter((product) => product.category === "custom_sublimation")
@@ -78,7 +97,7 @@ export async function POST(request: Request) {
     if (customSublimationProductIds.length > 0) {
       const { data: detailsData, error: detailsError } = await supabase
         .from("custom_sublimation_products")
-        .select("product_id,allow_image_upload,max_upload_mb")
+        .select("product_id,allow_image_upload,allow_gallery_selection,max_upload_mb")
         .in("product_id", customSublimationProductIds);
 
       if (detailsError) {
@@ -93,7 +112,10 @@ export async function POST(request: Request) {
       }
 
       for (const details of (detailsData ?? []) as CustomSublimationCheckoutDetails[]) {
-        customDetailsByProductId.set(details.product_id, details);
+        customDetailsByProductId.set(details.product_id, {
+          ...details,
+          allow_gallery_selection: details.allow_gallery_selection ?? false
+        });
       }
     }
 
@@ -123,6 +145,16 @@ export async function POST(request: Request) {
         return badRequest(`Product is not available for checkout: ${item.product_id}`);
       }
 
+      const variants = variantsByProduct.get(item.product_id) ?? [];
+      const variantOutcome = validateProductVariantSelection(item.customization, variants);
+      if (!variantOutcome.ok) {
+        logWarn("checkout.session.invalid_variant", {
+          ...requestMeta,
+          productId: item.product_id
+        });
+        return badRequest(variantOutcome.message);
+      }
+
       const normalizedCustomization = normalizeCustomizationForCheckout(
         item.customization,
         product,
@@ -137,17 +169,41 @@ export async function POST(request: Request) {
         return badRequest(normalizedCustomization.message, normalizedCustomization.details);
       }
 
+      const normalized = appendVariantToCustomization(
+        normalizedCustomization.customization,
+        variantOutcome.customization
+      );
+      const studioPrint = normalized.studio_print as
+        | { id: string; storage_path: string; title?: string }
+        | undefined;
+      if (studioPrint) {
+        const studioOk = await assertStudioPrintCheckoutSelection(
+          supabase,
+          studioPrint.id,
+          studioPrint.storage_path
+        );
+        if (!studioOk) {
+          logWarn("checkout.session.invalid_studio_print", {
+            ...requestMeta,
+            productId: item.product_id,
+            studioPrintId: studioPrint.id
+          });
+          return badRequest("Selected studio print is not available");
+        }
+      }
+
       rpcItems.push({
         product_id: item.product_id,
         quantity: item.quantity,
-        customization: normalizedCustomization.customization
+        customization: normalized
       });
     }
 
     const { data, error } = await supabase.rpc("create_checkout_session", {
       p_customer_email: customer_email,
       p_shipping_address: shipping_address,
-      p_items: rpcItems
+      p_items: rpcItems,
+      p_promo_code: promo_code ?? null
     });
 
     if (error) {
@@ -175,6 +231,8 @@ export async function POST(request: Request) {
         totals: {
           subtotal_cents: row.subtotal_cents,
           shipping_cents: row.shipping_cents,
+          discount_cents: row.discount_cents ?? 0,
+          promo_code: row.promo_code ?? null,
           total_cents: row.total_cents,
           shipping_zone: row.shipping_zone,
           free_shipping_applied: row.free_shipping_applied

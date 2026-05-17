@@ -1,6 +1,5 @@
 import { notFound, serverError } from "@/lib/http/json";
-import { getPublicProductBySlug } from "@/lib/storefront/products";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadCachedPublicProductBySlug } from "@/lib/server/storefront-data-cache";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -16,8 +15,7 @@ export async function GET(
       return notFound("Product not found");
     }
 
-    const supabase = getSupabaseAdminClient();
-    const product = await getPublicProductBySlug(supabase, normalizedSlug);
+    const product = await loadCachedPublicProductBySlug(normalizedSlug);
     if (!product) {
       return notFound("Product not found");
     }
@@ -27,7 +25,7 @@ export async function GET(
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120"
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600"
         }
       }
     );

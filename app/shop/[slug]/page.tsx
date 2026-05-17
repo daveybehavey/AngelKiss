@@ -1,12 +1,12 @@
-import { AddToCartPanel } from "@/components/storefront/add-to-cart-panel";
-import { ProductGallery } from "@/components/storefront/product-gallery";
-import { formatStorefrontMoney } from "@/lib/storefront/product-display";
+import { ProductPurchaseSection } from "@/components/storefront/product-purchase-section";
+import { formatShopperProductTitle } from "@/lib/storefront/product-display";
 import { getPublicProductBySlugCached } from "@/lib/storefront/get-public-product-cached";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+/** ISR seconds — literal required by Next.js; keep in sync with `STOREFRONT_DATA_REVALIDATE_SEC` in `lib/server/storefront-data-cache.ts`. */
+export const revalidate = 1800;
 
 function getInventoryStatusText(
   inventoryMode: "finite" | "made_to_order",
@@ -34,6 +34,18 @@ function getInventoryStatusTone(
   return "is-in-stock";
 }
 
+/** Default white is normal for sublimation — omit from shopper-facing copy. */
+function formatDisplayBlankColor(raw: string | undefined | null): string | null {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed.length) {
+    return null;
+  }
+  if (trimmed.toLowerCase() === "white") {
+    return null;
+  }
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
 export async function generateMetadata({
   params
 }: {
@@ -54,22 +66,23 @@ export async function generateMetadata({
       };
     }
 
+    const displayName = formatShopperProductTitle(product.name);
     const description =
       product.short_description?.trim() ||
       product.long_description?.trim().slice(0, 160) ||
-      `Shop ${product.name} at AnglKiss Creations.`;
+      `Shop ${displayName} at AnglKiss Creations.`;
 
     return {
-      title: product.name,
+      title: displayName,
       description,
       openGraph: {
-        title: product.name,
+        title: displayName,
         description,
         type: "website"
       },
       twitter: {
         card: "summary_large_image",
-        title: product.name,
+        title: displayName,
         description
       }
     };
@@ -79,17 +92,31 @@ export async function generateMetadata({
 }
 
 export default async function ProductPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ studio_print?: string }>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
+  const studioPrintFromQuery =
+    typeof sp.studio_print === "string" && sp.studio_print.trim().length > 0
+      ? sp.studio_print.trim()
+      : undefined;
   const normalizedSlug = slug.trim().toLowerCase();
   const product = await getPublicProductBySlugCached(normalizedSlug);
 
   if (!product) {
     notFound();
   }
+
+  const displayTitle = formatShopperProductTitle(product.name);
+
+  const displayBlankColor =
+    product.category === "custom_sublimation" && product.custom_sublimation_details
+      ? formatDisplayBlankColor(product.custom_sublimation_details.default_blank_color)
+      : null;
 
   return (
     <main className="page-main product-page">
@@ -100,13 +127,40 @@ export default async function ProductPage({
       </p>
 
       <section className="panel product-layout">
-        <ProductGallery productName={product.name} images={product.images} />
+        <ProductPurchaseSection
+          productName={displayTitle}
+          basePriceCents={product.base_price_cents}
+          currency={product.currency}
+          images={product.images}
+          variants={product.variants}
+          initialStudioPrintId={studioPrintFromQuery}
+          product={{
+            id: product.id,
+            slug: product.slug,
+            name: displayTitle,
+            category: product.category,
+            base_price_cents: product.base_price_cents,
+            currency: product.currency,
+            can_purchase: product.can_purchase,
+            inventory_mode: product.inventory_mode,
+            available_quantity: product.available_quantity,
+            primary_image_url: product.primary_image_url,
+            primary_image_alt: product.primary_image_alt,
+            customization:
+              product.category === "custom_sublimation" && product.custom_sublimation_details
+                ? {
+                    allow_image_upload: product.custom_sublimation_details.allow_image_upload,
+                    max_upload_mb: product.custom_sublimation_details.max_upload_mb,
+                    allow_gallery_selection:
+                      product.custom_sublimation_details.allow_gallery_selection ||
+                      product.custom_sublimation_details.allow_image_upload
+                  }
+                : null
+          }}
+        />
 
         <div className="product-summary">
-          <h1 className="product-title">{product.name}</h1>
-          <p className="product-price">
-            {formatStorefrontMoney(product.base_price_cents, product.currency)}
-          </p>
+          <h1 className="product-title">{displayTitle}</h1>
           <p
             className={`product-stock-pill ${getInventoryStatusTone(
               product.inventory_mode,
@@ -129,7 +183,6 @@ export default async function ProductPage({
             <div className="product-detail-card">
               <h2>Handmade Details</h2>
               <p>Material: {product.handmade_details.material}</p>
-              <p>Lead time: {product.handmade_details.lead_time_days} days</p>
               <p>
                 Personalization:{" "}
                 {product.handmade_details.personalization_available ? "Yes" : "No"}
@@ -146,13 +199,23 @@ export default async function ProductPage({
               <p>
                 Style:{" "}
                 {product.custom_sublimation_details.allow_image_upload
-                  ? "Custom photo upload"
-                  : "Ready-made design by AnglKiss Creations"}
+                  ? "Your photo or in-house gallery print"
+                  : product.custom_sublimation_details.allow_gallery_selection
+                    ? "Studio print gallery"
+                    : "Ready-made design by AnglKiss Creations"}
               </p>
-              <p>Blank color: {product.custom_sublimation_details.default_blank_color}</p>
               {product.custom_sublimation_details.allow_image_upload ? (
                 <p>Max upload size: {product.custom_sublimation_details.max_upload_mb} MB</p>
               ) : null}
+              {product.custom_sublimation_details.allow_image_upload ? (
+                <p>
+                  Upload your own image, or choose one of our studio prints when you add to
+                  cart—whichever fits your order.
+                </p>
+              ) : product.custom_sublimation_details.allow_gallery_selection ? (
+                <p>You can pick one of our in-house prints when you add to cart.</p>
+              ) : null}
+              {displayBlankColor ? <p>Base color: {displayBlankColor}</p> : null}
               <p>
                 Text overlay:{" "}
                 {product.custom_sublimation_details.allow_text_overlay ? "Yes" : "No"}
@@ -168,30 +231,6 @@ export default async function ProductPage({
             <p>Need help before ordering? Email anglkisscreations@gmail.com.</p>
           </div>
 
-          <AddToCartPanel
-            product={{
-              id: product.id,
-              slug: product.slug,
-              name: product.name,
-              category: product.category,
-              base_price_cents: product.base_price_cents,
-              currency: product.currency,
-              can_purchase: product.can_purchase,
-              inventory_mode: product.inventory_mode,
-              available_quantity: product.available_quantity,
-              primary_image_url: product.primary_image_url,
-              primary_image_alt: product.primary_image_alt,
-              customization:
-                product.category === "custom_sublimation" &&
-                product.custom_sublimation_details
-                  ? {
-                      allow_image_upload:
-                        product.custom_sublimation_details.allow_image_upload,
-                      max_upload_mb: product.custom_sublimation_details.max_upload_mb
-                    }
-                  : null
-            }}
-          />
         </div>
       </section>
     </main>

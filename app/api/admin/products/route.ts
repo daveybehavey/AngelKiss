@@ -16,6 +16,7 @@ const customDetailsSchema = z.object({
   safe_area_height: z.number().int().positive(),
   max_upload_mb: z.number().int().positive().default(20),
   allow_image_upload: z.boolean().default(true),
+  allow_gallery_selection: z.boolean().default(false),
   allow_text_overlay: z.boolean().default(true),
   max_text_layers: z.number().int().nonnegative().default(3),
   allowed_fonts: z.array(z.string().min(1)).default(["Arial", "Montserrat", "Playfair Display"])
@@ -23,7 +24,7 @@ const customDetailsSchema = z.object({
 
 const handmadeDetailsSchema = z.object({
   material: z.string().min(1),
-  care_instructions: z.string().optional(),
+  care_instructions: z.string().nullable().optional(),
   lead_time_days: z.number().int().nonnegative().default(7),
   personalization_available: z.boolean().default(false)
 });
@@ -35,7 +36,7 @@ const bodySchema = z.object({
   short_description: z.string().optional(),
   long_description: z.string().optional(),
   base_price_cents: z.number().int().positive(),
-  currency: z.string().length(3).default("USD"),
+  currency: z.string().length(3).default("CAD"),
   inventory_mode: z.enum(["finite", "made_to_order"]),
   stock_quantity: z.number().int().nonnegative().nullable().optional(),
   low_stock_threshold: z.number().int().nonnegative().default(2),
@@ -153,6 +154,9 @@ export async function POST(request: Request) {
         safe_area_height: details.safe_area_height,
         max_upload_mb: details.max_upload_mb,
         allow_image_upload: details.allow_image_upload,
+        allow_gallery_selection: details.allow_image_upload
+          ? true
+          : details.allow_gallery_selection,
         allow_text_overlay: details.allow_text_overlay,
         max_text_layers: details.max_text_layers,
         allowed_fonts: details.allowed_fonts

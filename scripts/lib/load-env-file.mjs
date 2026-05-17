@@ -11,7 +11,9 @@ export function loadEnvFile(filePath) {
     return {};
   }
   const out = {};
-  const text = readFileSync(filePath, "utf8");
+  let text = readFileSync(filePath, "utf8");
+  // Strip UTF-8 BOM so keys like CLOUDFLARE_API_TOKEN parse correctly on Windows editors.
+  text = text.replace(/^\uFEFF/, "");
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) {

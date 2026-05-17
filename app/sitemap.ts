@@ -1,9 +1,8 @@
 import { getSiteOrigin } from "@/lib/site-url";
-import { listPublicProducts } from "@/lib/storefront/products";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadCachedListPublicProductsForApi } from "@/lib/server/storefront-data-cache";
 import type { MetadataRoute } from "next";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = getSiteOrigin();
@@ -12,6 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPaths = [
     "",
     "/shop",
+    "/gallery",
     "/cart",
     "/checkout",
     "/shipping",
@@ -27,8 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { items } = await listPublicProducts(supabase, { limit: 500 });
+    const { items } = await loadCachedListPublicProductsForApi({ limit: 500 });
     for (const item of items) {
       entries.push({
         url: `${origin}/shop/${item.slug}`,

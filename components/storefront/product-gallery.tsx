@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import {
+  storefrontImageSrcOrNull,
+  storefrontImageUnoptimized
+} from "@/lib/storefront/storefront-image-src";
 
 type ProductGalleryImage = {
   id: string;
@@ -22,14 +26,18 @@ type GalleryImage = {
 
 function toGalleryImages(productName: string, images: ProductGalleryImage[]): GalleryImage[] {
   return images
-    .filter((image): image is ProductGalleryImage & { signed_url: string } => {
-      return typeof image.signed_url === "string" && image.signed_url.trim().length > 0;
+    .map((image) => {
+      const url = storefrontImageSrcOrNull(image.signed_url);
+      if (!url) {
+        return null;
+      }
+      return {
+        id: image.id,
+        url,
+        alt: image.alt_text ?? productName
+      };
     })
-    .map((image) => ({
-      id: image.id,
-      url: image.signed_url,
-      alt: image.alt_text ?? productName
-    }));
+    .filter((x): x is GalleryImage => x !== null);
 }
 
 export function ProductGallery({ productName, images }: ProductGalleryProps) {
@@ -64,6 +72,7 @@ export function ProductGallery({ productName, images }: ProductGalleryProps) {
           priority={selectedIndex === 0}
           sizes="(max-width: 900px) 100vw, min(520px, 45vw)"
           className="product-main-image"
+          unoptimized={storefrontImageUnoptimized(activeImage.url)}
         />
       </div>
 
@@ -87,6 +96,7 @@ export function ProductGallery({ productName, images }: ProductGalleryProps) {
                     height={90}
                     sizes="90px"
                     className="product-thumb-image"
+                    unoptimized={storefrontImageUnoptimized(image.url)}
                   />
                 </button>
               </li>

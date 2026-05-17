@@ -82,6 +82,7 @@ if (platform() === "win32") {
 }
 
 console.log("\nNext:");
-console.log("- Dev: npm run dev");
+console.log("- Dev: npm run dev  →  open http://127.0.0.1:3010 (uses WSL on Windows when healthy)");
+console.log("- Dev without WSL: npm run dev:win");
 console.log("- Deploy (auto-WSL on Windows if installed): npm run deploy");
 console.log("- If WSL toolchain missing inside Ubuntu: install Node/npm there, then npx wrangler login");

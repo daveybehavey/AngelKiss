@@ -1,4 +1,4 @@
-import { getCustomerUploadsBucket } from "@/lib/admin/images";
+import { getCustomerUploadsBucket, STUDIO_GALLERY_STORAGE_PREFIX } from "@/lib/admin/images";
 import { z } from "zod";
 
 export type CheckoutProductRow = {
@@ -12,6 +12,7 @@ export type CheckoutProductRow = {
 export type CustomSublimationCheckoutDetails = {
   product_id: string;
   allow_image_upload: boolean;
+  allow_gallery_selection: boolean;
   max_upload_mb: number;
 };
 
@@ -36,11 +37,41 @@ const customerUploadPayloadSchema = z
   })
   .strict();
 
+const studioPrintPayloadSchema = z
+  .object({
+    studio_print: z
+      .object({
+        id: z.string().uuid(),
+        storage_path: z.string().trim().min(1).max(512),
+        title: z.string().trim().max(160).optional()
+      })
+      .strict(),
+    customer_notes: z.string().trim().max(500).optional()
+  })
+  .strict();
+
 const preDesignedPayloadSchema = z
   .object({
     customer_notes: z.string().trim().max(500).optional()
   })
   .strict();
+
+function hasUploadKey(raw: Record<string, unknown>): boolean {
+  return raw.upload !== undefined && raw.upload !== null && typeof raw.upload === "object";
+}
+
+function hasStudioPrintKey(raw: Record<string, unknown>): boolean {
+  return (
+    raw.studio_print !== undefined &&
+    raw.studio_print !== null &&
+    typeof raw.studio_print === "object"
+  );
+}
+
+function validateStudioPrintPath(storagePath: string): boolean {
+  const trimmed = storagePath.trim();
+  return trimmed.startsWith(STUDIO_GALLERY_STORAGE_PREFIX);
+}
 
 export function normalizeCustomizationForCheckout(
   customizationInput: Record<string, unknown> | undefined,
@@ -48,6 +79,7 @@ export function normalizeCustomizationForCheckout(
   customDetailsByProductId: Map<string, CustomSublimationCheckoutDetails>
 ): ItemValidationOutcome {
   const rawCustomization = customizationInput ?? {};
+  const raw = rawCustomization as Record<string, unknown>;
 
   if (product.category !== "custom_sublimation") {
     return { ok: true, customization: {} };
@@ -61,12 +93,47 @@ export function normalizeCustomizationForCheckout(
     };
   }
 
-  if (details.allow_image_upload) {
-    const parsed = customerUploadPayloadSchema.safeParse(rawCustomization);
+  const allowUpload = details.allow_image_upload;
+  /** Custom photo listings always offer studio prints as an alternative to uploading. */
+  const allowGallery = details.allow_gallery_selection || allowUpload;
+
+  if (hasUploadKey(raw) && hasStudioPrintKey(raw)) {
+    return {
+      ok: false,
+      message: "Choose either your own photo upload or one studio print — not both"
+    };
+  }
+
+  if (allowUpload) {
+    if (hasStudioPrintKey(raw)) {
+      const parsed = studioPrintPayloadSchema.safeParse(raw);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          message: "Invalid studio print selection",
+          details: parsed.error.flatten()
+        };
+      }
+      if (!validateStudioPrintPath(parsed.data.studio_print.storage_path)) {
+        return {
+          ok: false,
+          message: "Studio print path is invalid"
+        };
+      }
+      return {
+        ok: true,
+        customization: {
+          studio_print: parsed.data.studio_print,
+          ...(parsed.data.customer_notes ? { customer_notes: parsed.data.customer_notes } : {})
+        }
+      };
+    }
+
+    const parsed = customerUploadPayloadSchema.safeParse(raw);
     if (!parsed.success) {
       return {
         ok: false,
-        message: "This custom product requires an uploaded image and rights confirmation",
+        message: "Upload your photo (or pick a studio print), and confirm image rights for uploads",
         details: parsed.error.flatten()
       };
     }
@@ -114,14 +181,36 @@ export function normalizeCustomizationForCheckout(
       customization: {
         upload: customization.upload,
         rights_acknowledged: true,
-        ...(customization.customer_notes
-          ? { customer_notes: customization.customer_notes }
-          : {})
+        ...(customization.customer_notes ? { customer_notes: customization.customer_notes } : {})
       }
     };
   }
 
-  const parsed = preDesignedPayloadSchema.safeParse(rawCustomization);
+  if (!allowUpload && allowGallery) {
+    const parsed = studioPrintPayloadSchema.safeParse(raw);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        message: "Please choose one of our studio prints for this item",
+        details: parsed.error.flatten()
+      };
+    }
+    if (!validateStudioPrintPath(parsed.data.studio_print.storage_path)) {
+      return {
+        ok: false,
+        message: "Studio print path is invalid"
+      };
+    }
+    return {
+      ok: true,
+      customization: {
+        studio_print: parsed.data.studio_print,
+        ...(parsed.data.customer_notes ? { customer_notes: parsed.data.customer_notes } : {})
+      }
+    };
+  }
+
+  const parsed = preDesignedPayloadSchema.safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,
@@ -133,8 +222,6 @@ export function normalizeCustomizationForCheckout(
 
   return {
     ok: true,
-    customization: parsed.data.customer_notes
-      ? { customer_notes: parsed.data.customer_notes }
-      : {}
+    customization: parsed.data.customer_notes ? { customer_notes: parsed.data.customer_notes } : {}
   };
 }

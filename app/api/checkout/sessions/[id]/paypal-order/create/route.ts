@@ -79,7 +79,7 @@ export async function POST(
     const paypalOrder = await createPayPalOrder({
       checkoutSessionId: checkout.id,
       totalCents: checkout.total_cents,
-      currencyCode: "USD"
+      currencyCode: "CAD"
     });
 
     const { error: updateError } = await supabase

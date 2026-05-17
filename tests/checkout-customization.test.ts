@@ -30,6 +30,22 @@ const readyMadeProduct: CheckoutProductRow = {
   deleted_at: null
 };
 
+const uploadGalleryProduct: CheckoutProductRow = {
+  id: "44444444-4444-4444-4444-444444444444",
+  category: "custom_sublimation",
+  status: "published",
+  is_available: true,
+  deleted_at: null
+};
+
+const galleryOnlyProduct: CheckoutProductRow = {
+  id: "55555555-5555-5555-5555-555555555555",
+  category: "custom_sublimation",
+  status: "published",
+  is_available: true,
+  deleted_at: null
+};
+
 function detailsMap(): Map<string, CustomSublimationCheckoutDetails> {
   return new Map<string, CustomSublimationCheckoutDetails>([
     [
@@ -37,6 +53,7 @@ function detailsMap(): Map<string, CustomSublimationCheckoutDetails> {
       {
         product_id: uploadProduct.id,
         allow_image_upload: true,
+        allow_gallery_selection: false,
         max_upload_mb: 20
       }
     ],
@@ -45,6 +62,25 @@ function detailsMap(): Map<string, CustomSublimationCheckoutDetails> {
       {
         product_id: readyMadeProduct.id,
         allow_image_upload: false,
+        allow_gallery_selection: false,
+        max_upload_mb: 20
+      }
+    ],
+    [
+      uploadGalleryProduct.id,
+      {
+        product_id: uploadGalleryProduct.id,
+        allow_image_upload: true,
+        allow_gallery_selection: true,
+        max_upload_mb: 20
+      }
+    ],
+    [
+      galleryOnlyProduct.id,
+      {
+        product_id: galleryOnlyProduct.id,
+        allow_image_upload: false,
+        allow_gallery_selection: true,
         max_upload_mb: 20
       }
     ]
@@ -136,4 +172,105 @@ test("ready-made sublimation rejects upload payload", () => {
     result.message,
     "This sublimation item is pre-designed and does not accept customer image uploads"
   );
+});
+
+test("custom photo upload accepts studio print even when allow_gallery_selection is false in DB", () => {
+  const result = normalizeCustomizationForCheckout(
+    {
+      studio_print: {
+        id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        storage_path: "studio-gallery/from-upload-only.png",
+        title: "Client design"
+      }
+    },
+    uploadProduct,
+    detailsMap()
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.equal(
+    (result.customization.studio_print as { id: string }).id,
+    "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+  );
+});
+
+test("upload + gallery product accepts studio print payload", () => {
+  const result = normalizeCustomizationForCheckout(
+    {
+      studio_print: {
+        id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        storage_path: "studio-gallery/print-one.png",
+        title: "Spring bouquet"
+      }
+    },
+    uploadGalleryProduct,
+    detailsMap()
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) {
+    return;
+  }
+  assert.equal(
+    (result.customization.studio_print as { id: string }).id,
+    "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+  );
+});
+
+test("upload + gallery product rejects upload and studio together", () => {
+  const result = normalizeCustomizationForCheckout(
+    {
+      studio_print: {
+        id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        storage_path: "studio-gallery/print-one.png"
+      },
+      upload: {
+        bucket: "customer-design-uploads",
+        storage_path: `customizations/${uploadGalleryProduct.id}/photo.png`
+      },
+      rights_acknowledged: true
+    },
+    uploadGalleryProduct,
+    detailsMap()
+  );
+
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+  assert.equal(result.message, "Choose either your own photo upload or one studio print — not both");
+});
+
+test("gallery-only product requires studio print", () => {
+  const ok = normalizeCustomizationForCheckout(
+    {},
+    galleryOnlyProduct,
+    detailsMap()
+  );
+  assert.equal(ok.ok, false);
+  if (ok.ok) {
+    return;
+  }
+  assert.equal(ok.message, "Please choose one of our studio prints for this item");
+});
+
+test("gallery-only product rejects bad studio path prefix", () => {
+  const result = normalizeCustomizationForCheckout(
+    {
+      studio_print: {
+        id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        storage_path: "other-folder/print.png"
+      }
+    },
+    galleryOnlyProduct,
+    detailsMap()
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) {
+    return;
+  }
+  assert.equal(result.message, "Studio print path is invalid");
 });

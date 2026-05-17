@@ -1,6 +1,16 @@
 import type { ProductCategory } from "@/lib/admin/products";
 import type { SublimationMode } from "@/lib/storefront/products";
 
+/**
+ * Display tweak: `11oz`, `11OZ`, `11 oz` → normalized `11 oz` (and keeps a trailing period outside the unit).
+ * Does not change stored catalog names—use only for shopper-facing copy.
+ */
+export function formatShopperProductTitle(name: string): string {
+  return name.replace(/\b(\d+)\s*(oz|OZ)(\.(?=\s|$))?/gi, (_match, digits: string, _oz: string, dot?: string) => {
+    return `${digits} oz${dot ?? ""}`;
+  });
+}
+
 export function formatStorefrontMoney(cents: number, currency: string): string {
   return `${(cents / 100).toFixed(2)} ${currency}`;
 }

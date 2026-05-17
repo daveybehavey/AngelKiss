@@ -48,6 +48,15 @@ export function getStoragePathForCustomizationUpload(productId: string, filename
   return `customizations/${productId}/${Date.now()}-${random}-${safeFilename}`;
 }
 
+/** Studio-owned art for gallery + custom orders (same bucket as catalog product images). */
+export const STUDIO_GALLERY_STORAGE_PREFIX = "studio-gallery/";
+
+export function getStoragePathForStudioGalleryPrint(filename: string): string {
+  const safeFilename = sanitizeFilename(filename);
+  const random = randomUUID().replace(/-/g, "").slice(0, 12);
+  return `${STUDIO_GALLERY_STORAGE_PREFIX}${Date.now()}-${random}-${safeFilename}`;
+}
+
 export function normalizeStoragePathForBucket(storagePath: string, bucket: string): string {
   const value = storagePath.trim();
   const prefix = `${bucket}/`;

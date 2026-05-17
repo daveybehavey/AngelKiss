@@ -1,3 +1,0 @@
--- Legacy migration placeholder.
--- Kept to match existing remote migration history version 20260328.
--- Intentionally left blank.

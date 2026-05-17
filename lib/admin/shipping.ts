@@ -97,7 +97,7 @@ function defaultLabelForZone(zone: ShippingZone): string {
   if (zone === "local") return "Local shipping";
   if (zone === "regional") return "Regional shipping";
   if (zone === "national") return "Across Canada shipping";
-  return "USA tracked shipping";
+  return "Legacy tracked shipping";
 }
 
 function defaultSortOrderForZone(zone: ShippingZone): number {

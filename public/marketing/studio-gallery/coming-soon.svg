@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="cs-title">
+  <title id="cs-title">Coming soon  print preview</title>
+  <defs>
+    <linearGradient id="cs-sky" x1="8%" y1="0%" x2="92%" y2="100%">
+      <stop offset="0%" stop-color="#e4dcf4"/>
+      <stop offset="42%" stop-color="#d4c8ec"/>
+      <stop offset="72%" stop-color="#b8acd2"/>
+      <stop offset="100%" stop-color="#9a86b8"/>
+    </linearGradient>
+    <linearGradient id="cs-glow" x1="50%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#9e3d62" stop-opacity="0"/>
+      <stop offset="55%" stop-color="#9e3d62" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#c9728e" stop-opacity="0.28"/>
+    </linearGradient>
+    <radialGradient id="cs-spot" cx="78%" cy="18%" r="45%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#cs-sky)"/>
+  <rect width="1200" height="900" fill="url(#cs-glow)"/>
+  <ellipse cx="930" cy="160" rx="380" ry="220" fill="url(#cs-spot)"/>
+  <!-- Soft frame -->
+  <rect x="72" y="54" width="1056" height="792" rx="36" ry="36" fill="none" stroke="#4a3770" stroke-opacity="0.18" stroke-width="3"/>
+  <rect x="88" y="70" width="1024" height="760" rx="28" ry="28" fill="#fff" fill-opacity="0.22"/>
+  <!-- Decorative corner arcs -->
+  <path d="M 120 120 A 48 48 0 0 1 168 120" fill="none" stroke="#9e3d62" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 1080 780 A 48 48 0 0 1 1032 780" fill="none" stroke="#4a3770" stroke-opacity="0.3" stroke-width="4" stroke-linecap="round"/>
+  <!-- Main type -->
+  <text x="600" y="400" text-anchor="middle" font-family="Georgia, 'Palatino Linotype', Palatino, serif" font-size="86" font-weight="600" fill="#1e142c" letter-spacing="0.02em">Coming soon</text>
+  <text x="600" y="468" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="600" fill="#4a3770" opacity="0.88" letter-spacing="0.22em" text-transform="uppercase">Print preview</text>
+  <text x="600" y="528" text-anchor="middle" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" fill="#261d2e" opacity="0.72">This design will appear here once the image is ready.</text>
+</svg>

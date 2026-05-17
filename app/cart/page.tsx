@@ -2,10 +2,27 @@
 
 import { useCart } from "@/components/storefront/cart-provider";
 import { lineTotalCents } from "@/lib/storefront/cart";
+import { formatShopperProductTitle } from "@/lib/storefront/product-display";
+import Image from "next/image";
 import Link from "next/link";
 
 function formatMoney(cents: number, currency: string): string {
   return `${(cents / 100).toFixed(2)} ${currency}`;
+}
+
+function getStudioPrintLabel(customization: Record<string, unknown> | undefined): string | null {
+  if (!customization || typeof customization !== "object" || Array.isArray(customization)) {
+    return null;
+  }
+  const sp = customization.studio_print;
+  if (!sp || typeof sp !== "object" || Array.isArray(sp)) {
+    return null;
+  }
+  const title = (sp as Record<string, unknown>).title;
+  if (typeof title === "string" && title.trim().length > 0) {
+    return title.trim();
+  }
+  return "Studio gallery print";
 }
 
 function getCustomizationUploadFilename(customization: Record<string, unknown> | undefined): string | null {
@@ -32,7 +49,7 @@ export default function CartPage() {
       <section className="panel page-intro">
         <h1 className="page-title">Your Cart</h1>
         <p className="page-lead">A quick review before checkout.</p>
-        <p className="admin-note-tight">
+        <p className="page-note-tight">
           Shipping is calculated after you enter your address at checkout.
         </p>
         <p className="page-link-row">
@@ -52,15 +69,41 @@ export default function CartPage() {
         <>
           <ul className="cart-list">
             {items.map((item) => {
+              const displayTitle = formatShopperProductTitle(item.name);
               const customizationUploadFilename = getCustomizationUploadFilename(
                 item.customization
               );
+              const studioPrintLabel = getStudioPrintLabel(item.customization);
+              const thumbAlt = (item.image_alt?.trim() || displayTitle).slice(0, 200);
 
               return (
                 <li key={item.cart_item_id} className="panel cart-item">
-                  <div className="cart-item-details">
+                  <div className="cart-item-main">
+                    <div className="cart-item-thumb">
+                      {item.image_url ? (
+                        <Link
+                          href={`/shop/${item.slug}`}
+                          className="cart-item-thumb-link"
+                          aria-label={`View product: ${displayTitle}`}
+                        >
+                          <Image
+                            src={item.image_url}
+                            alt={thumbAlt}
+                            width={96}
+                            height={96}
+                            className="cart-item-thumb-img"
+                            sizes="96px"
+                          />
+                        </Link>
+                      ) : (
+                        <span className="cart-item-thumb-placeholder" aria-hidden="true">
+                          Photo soon
+                        </span>
+                      )}
+                    </div>
+                    <div className="cart-item-details">
                     <p className="cart-item-name">
-                      <Link href={`/shop/${item.slug}`}>{item.name}</Link>
+                      <Link href={`/shop/${item.slug}`}>{displayTitle}</Link>
                     </p>
                     <p className="cart-item-meta">
                       Unit: {formatMoney(item.unit_price_cents, item.currency)}
@@ -79,9 +122,13 @@ export default function CartPage() {
                         Photo uploaded: {customizationUploadFilename}
                       </p>
                     ) : null}
+                    {studioPrintLabel ? (
+                      <p className="cart-item-custom-note">Studio print: {studioPrintLabel}</p>
+                    ) : null}
                     <p className="cart-item-meta">
                       Line total: {formatMoney(lineTotalCents(item), item.currency)}
                     </p>
+                    </div>
                   </div>
 
                   <div className="cart-item-controls">

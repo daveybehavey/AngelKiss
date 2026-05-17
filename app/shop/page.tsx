@@ -1,10 +1,8 @@
 import type { ProductCategory } from "@/lib/admin/products";
 import { ShopProductGrid } from "@/components/storefront/shop-product-grid";
-import {
-  getPublishedShopOverview,
-  listPublicProducts,
-  type SublimationMode
-} from "@/lib/storefront/products";
+import { ShopStudioPrintBanner } from "@/components/storefront/shop-studio-print-banner";
+import { loadCachedShopPageData } from "@/lib/server/storefront-data-cache";
+import type { SublimationMode } from "@/lib/storefront/products";
 import { buildShopHref } from "@/lib/storefront/shop-urls";
 import {
   SHOP_DEFAULT_DESCRIPTION,
@@ -13,11 +11,11 @@ import {
   SHOP_SUBLIMATION_DESCRIPTION,
   SHOP_UPLOAD_DESCRIPTION
 } from "@/lib/seo/shop-descriptions";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
+/** ISR seconds — literal required by Next.js; keep in sync with `STOREFRONT_DATA_REVALIDATE_SEC` in `lib/server/storefront-data-cache.ts`. */
+export const revalidate = 1800;
 
 function normalizeCategoryFilter(value: string | undefined): ProductCategory | null {
   if (value === "custom_sublimation") {
@@ -42,7 +40,7 @@ function normalizeSublimationModeFilter(value: string | undefined): SublimationM
 export async function generateMetadata({
   searchParams
 }: {
-  searchParams: Promise<{ category?: string; sublimation_mode?: string }>;
+  searchParams: Promise<{ category?: string; sublimation_mode?: string; studio_print?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
   const category = normalizeCategoryFilter(params.category);
@@ -84,30 +82,20 @@ export async function generateMetadata({
 export default async function ShopPage({
   searchParams
 }: {
-  searchParams: Promise<{ category?: string; sublimation_mode?: string }>;
+  searchParams: Promise<{ category?: string; sublimation_mode?: string; studio_print?: string }>;
 }) {
   const params = await searchParams;
   const categoryFilter = normalizeCategoryFilter(params.category);
   const sublimationModeFilter = normalizeSublimationModeFilter(params.sublimation_mode);
-
-  const supabase = getSupabaseAdminClient();
-
-  const listCategory =
-    categoryFilter ?? (sublimationModeFilter ? ("custom_sublimation" as const) : undefined);
-  const listSublimationMode =
-    categoryFilter === "custom_sublimation" ||
-    (categoryFilter === undefined && sublimationModeFilter !== null)
-      ? sublimationModeFilter ?? undefined
+  const studioPrintFromQuery =
+    typeof params.studio_print === "string" && params.studio_print.trim().length > 0
+      ? params.studio_print.trim()
       : undefined;
 
-  const [overview, { items: filteredItems }] = await Promise.all([
-    getPublishedShopOverview(supabase),
-    listPublicProducts(supabase, {
-      category: listCategory,
-      sublimationMode: listSublimationMode,
-      limit: 200
-    })
-  ]);
+  const [overview, { items: filteredItems }] = await loadCachedShopPageData(
+    categoryFilter,
+    sublimationModeFilter
+  );
 
   const {
     total: itemsTotal,
@@ -128,6 +116,8 @@ export default async function ShopPage({
           one place.
         </p>
       </section>
+
+      <ShopStudioPrintBanner studioPrintId={studioPrintFromQuery} />
 
       <section className="shop-overview-grid shop-overview-stagger" aria-label="Collection overview">
         <article className="shop-overview-card shop-overview-card-tilt">

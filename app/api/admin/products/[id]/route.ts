@@ -21,6 +21,7 @@ const customDetailsPatchSchema = z
     safe_area_height: z.number().int().positive().optional(),
     max_upload_mb: z.number().int().positive().optional(),
     allow_image_upload: z.boolean().optional(),
+    allow_gallery_selection: z.boolean().optional(),
     allow_text_overlay: z.boolean().optional(),
     max_text_layers: z.number().int().nonnegative().optional(),
     allowed_fonts: z.array(z.string().min(1)).optional()
@@ -182,9 +183,14 @@ export async function PATCH(
         return badRequest("custom_sublimation_details row is missing for this product");
       }
 
+      const subPatch = { ...body.custom_sublimation_details };
+      if (subPatch.allow_image_upload === true) {
+        subPatch.allow_gallery_selection = true;
+      }
+
       const { error: detailsError } = await supabase
         .from("custom_sublimation_products")
-        .update(body.custom_sublimation_details)
+        .update(subPatch)
         .eq("product_id", id);
 
       if (detailsError) {

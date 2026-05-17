@@ -3,7 +3,18 @@ import { chromium } from "playwright";
 const baseUrl =
   process.env.MOBILE_QA_BASE_URL?.trim() ||
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-  "https://angelkisscreations.com";
+  "https://anglkisscreations.ca";
+
+const isLocalBase = /127\.0\.0\.1|localhost/i.test(baseUrl);
+
+/** `networkidle` often never fires on `next dev` (HMR / long-lived connections). */
+const gotoWaitUntil =
+  process.env.MOBILE_QA_WAIT_UNTIL?.trim() ||
+  (isLocalBase ? "load" : "networkidle");
+
+/** First compile on Windows dev can exceed 60s; production `next start` is much faster. */
+const gotoTimeoutMs = Number(process.env.MOBILE_QA_TIMEOUT_MS?.trim() || "") ||
+  (isLocalBase ? 300_000 : 60_000);
 
 const pages = ["/", "/shop", "/cart", "/checkout", "/admin", "/admin/orders"];
 const viewports = [
@@ -23,8 +34,8 @@ try {
 
     for (const route of pages) {
       const url = `${baseUrl}${route}`;
-      await page.goto(url, { waitUntil: "networkidle", timeout: 60_000 });
-      await page.waitForTimeout(150);
+      await page.goto(url, { waitUntil: gotoWaitUntil, timeout: gotoTimeoutMs });
+      await page.waitForTimeout(250);
 
       const metrics = await page.evaluate(() => {
         const root = document.documentElement;

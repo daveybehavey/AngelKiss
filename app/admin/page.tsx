@@ -1,6 +1,9 @@
 "use client";
 
 import {
+  AdminProductVariantsPanel
+} from "@/components/admin/admin-product-variants-panel";
+import {
   AdminToastStack,
   type AdminToast,
   type AdminToastKind
@@ -14,6 +17,7 @@ import {
   type ShippingOriginField,
   type ShippingOriginFieldErrors
 } from "@/lib/admin/shipping-validation";
+import { optimizeImageFileForUpload } from "@/lib/client/optimize-image-for-upload";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -23,6 +27,7 @@ type ProductStatus = "draft" | "published" | "unpublished";
 type InventoryMode = "finite" | "made_to_order";
 type ProductViewFilter = "all" | "needs_attention" | "low_stock" | "sold_out" | "no_images" | "hidden";
 type AdminView = "home" | "add" | "manage" | "shipping";
+type ManageMode = "quick" | "advanced";
 type ShippingZone = "local" | "regional" | "national" | "usa";
 
 type ProductSummary = {
@@ -61,6 +66,7 @@ type ProductImage = {
   alt_text: string | null;
   sort_order: number;
   is_primary: boolean;
+  variant_id: string | null;
   created_at: string;
 };
 
@@ -73,6 +79,12 @@ type UploadUrlResponse = {
   storagePath: string;
   expiresAt: string;
   token?: string;
+};
+
+type CreateProductResponse = {
+  product?: {
+    id: string;
+  };
 };
 
 type ShippingSettingsResponse = {
@@ -109,13 +121,13 @@ type ShippingRateDraft = {
 };
 
 const supabase = getSupabaseBrowserClient();
-const SHIPPING_ZONE_ORDER: ShippingZone[] = ["local", "regional", "national", "usa"];
+const SHIPPING_ZONE_ORDER: ShippingZone[] = ["local", "regional", "national"];
 
 const SHIPPING_ZONE_NAMES: Record<ShippingZone, string> = {
   local: "Local",
   regional: "Regional",
   national: "Across Canada",
-  usa: "USA"
+  usa: "Legacy"
 };
 
 const DEFAULT_SHIPPING_ZONE_DOLLARS: Record<ShippingZone, string> = {
@@ -167,7 +179,7 @@ function formatInventoryMode(mode: InventoryMode): string {
 }
 
 function formatSublimationMode(allowImageUpload: boolean): string {
-  return allowImageUpload ? "Upload your photo" : "Ready-made design";
+  return allowImageUpload ? "Custom photo upload" : "Ready-made print";
 }
 
 function formatShippingZone(zone: ShippingZone): string {
@@ -227,10 +239,11 @@ export default function AdminPage() {
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
+  const [nameDraftByProduct, setNameDraftByProduct] = useState<Record<string, string>>({});
   const [priceDraftByProduct, setPriceDraftByProduct] = useState<Record<string, string>>({});
   const [stockDraftByProduct, setStockDraftByProduct] = useState<Record<string, string>>({});
   const [imagesByProduct, setImagesByProduct] = useState<Record<string, ProductImage[]>>({});
-  const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File[]>>({});
   const [uploadAsPrimary, setUploadAsPrimary] = useState<Record<string, boolean>>({});
 
   const [name, setName] = useState("");
@@ -238,12 +251,17 @@ export default function AdminPage() {
   const [priceDollars, setPriceDollars] = useState("10.00");
   const [trackStock, setTrackStock] = useState(true);
   const [stockQuantity, setStockQuantity] = useState("1");
-  const [allowCustomerUpload, setAllowCustomerUpload] = useState(true);
+  /** false = ready-made print (shop: Ready-Made Prints); true = customer uploads (shop: Custom Photo Upload). */
+  const [allowCustomerUpload, setAllowCustomerUpload] = useState(false);
   const [material, setMaterial] = useState("Cotton yarn");
+  const [createPhotoFiles, setCreatePhotoFiles] = useState<File[]>([]);
+  const [createPhotoAsPrimary, setCreatePhotoAsPrimary] = useState(true);
   const [createBusy, setCreateBusy] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [productViewFilter, setProductViewFilter] = useState<ProductViewFilter>("all");
   const [adminView, setAdminView] = useState<AdminView>("home");
+  const [manageMode, setManageMode] = useState<ManageMode>("quick");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [savingShippingSettings, setSavingShippingSettings] = useState(false);
   const [savingShippingRates, setSavingShippingRates] = useState(false);
@@ -262,6 +280,10 @@ export default function AdminPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [toasts, setToasts] = useState<AdminToast[]>([]);
   const nextToastId = useRef(1);
+  const createPhotoPreviewUrls = useMemo(
+    () => createPhotoFiles.map((file) => URL.createObjectURL(file)),
+    [createPhotoFiles]
+  );
 
   const [newsletterItems, setNewsletterItems] = useState<
     Array<{ email: string; created_at: string; source: string }>
@@ -382,6 +404,9 @@ export default function AdminPage() {
       const result = (await callAdmin("/api/admin/products?limit=100")) as ProductsResponse;
       const items = result.items ?? [];
       setProducts(items);
+      setNameDraftByProduct(
+        Object.fromEntries(items.map((item) => [item.id, item.name]))
+      );
       setPriceDraftByProduct(
         Object.fromEntries(items.map((item) => [item.id, (item.base_price_cents / 100).toFixed(2)]))
       );
@@ -479,6 +504,18 @@ export default function AdminPage() {
     pushToast("success", message);
     setMessage(null);
   }, [message, pushToast]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of createPhotoPreviewUrls) {
+        URL.revokeObjectURL(url);
+      }
+    };
+  }, [createPhotoPreviewUrls]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [adminView]);
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -699,7 +736,7 @@ export default function AdminPage() {
         slug: finalSlug,
         category,
         base_price_cents: basePriceCents,
-        currency: "USD",
+        currency: "CAD",
         inventory_mode: inventoryMode,
         is_available: true,
         status: "draft",
@@ -731,22 +768,60 @@ export default function AdminPage() {
       } else {
         payload.handmade_details = {
           material: material.trim() || "Cotton yarn",
-          care_instructions: null,
           lead_time_days: 7,
           personalization_available: false
         };
       }
 
-      await callAdmin("/api/admin/products", {
+      const created = (await callAdmin("/api/admin/products", {
         method: "POST",
         body: JSON.stringify(payload)
-      });
+      })) as CreateProductResponse;
 
-      setMessage("Product added.");
+      const createdProductId = created.product?.id;
+      if (createPhotoFiles.length > 0 && createdProductId) {
+        for (let i = 0; i < createPhotoFiles.length; i++) {
+          const file = createPhotoFiles[i]!;
+          const optimized = await optimizeImageFileForUpload(file);
+          const uploadInfo = (await callAdmin(`/api/admin/products/${createdProductId}/images/upload-url`, {
+            method: "POST",
+            body: JSON.stringify({
+              filename: optimized.filename,
+              content_type: optimized.contentType
+            })
+          })) as UploadUrlResponse;
+
+          const uploadResponse = await fetch(uploadInfo.uploadUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": optimized.contentType
+            },
+            body: optimized.blob
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Image upload failed for “${file.name}” (${uploadResponse.status})`);
+          }
+
+          await callAdmin(`/api/admin/products/${createdProductId}/images`, {
+            method: "POST",
+            body: JSON.stringify({
+              storage_path: uploadInfo.storagePath,
+              is_primary: i === 0 && createPhotoAsPrimary
+            })
+          });
+        }
+      }
+
+      setMessage(
+        "Product added. It starts as Draft — open Edit & manage items and tap Publish so it appears in the shop."
+      );
       setName("");
       setStockQuantity("1");
       setTrackStock(defaultTrackStockForCategory(category));
-      setAllowCustomerUpload(true);
+      setAllowCustomerUpload(false);
+      setCreatePhotoFiles([]);
+      setCreatePhotoAsPrimary(true);
       await loadProducts();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Failed to create product");
@@ -800,7 +875,10 @@ export default function AdminPage() {
     }
   }
 
-  async function toggleSublimationMode(product: ProductSummary) {
+  async function setSublimationListingMode(
+    product: ProductSummary,
+    listing: "ready_made_print" | "customer_photo_upload"
+  ) {
     if (product.category !== "custom_sublimation") {
       return;
     }
@@ -811,46 +889,8 @@ export default function AdminPage() {
       return;
     }
 
-    const nextMode = !currentMode;
-
-    setBusyProductId(product.id);
-    setError(null);
-    setMessage(null);
-
-    try {
-      await callAdmin(`/api/admin/products/${product.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          custom_sublimation_details: {
-            allow_image_upload: nextMode,
-            allow_text_overlay: nextMode,
-            max_text_layers: nextMode ? 3 : 0
-          }
-        })
-      });
-
-      setMessage(
-        nextMode
-          ? "Sublimation mode updated: customer image upload is required."
-          : "Sublimation mode updated: ready-made design (no customer upload)."
-      );
-      await loadProducts();
-    } catch (updateError) {
-      setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Failed to update sublimation mode"
-      );
-    } finally {
-      setBusyProductId(null);
-    }
-  }
-
-  async function updatePrice(product: ProductSummary) {
-    const draft = priceDraftByProduct[product.id]?.trim() ?? "";
-    const cents = dollarsToCents(draft);
-    if (!cents) {
-      setError("Price must be greater than 0");
+    const wantCustomerUpload = listing === "customer_photo_upload";
+    if (currentMode === wantCustomerUpload) {
       return;
     }
 
@@ -861,12 +901,82 @@ export default function AdminPage() {
     try {
       await callAdmin(`/api/admin/products/${product.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ base_price_cents: cents })
+        body: JSON.stringify({
+          custom_sublimation_details: {
+            allow_image_upload: wantCustomerUpload,
+            allow_text_overlay: wantCustomerUpload,
+            max_text_layers: wantCustomerUpload ? 3 : 0
+          }
+        })
       });
-      setMessage("Price updated.");
+
+      setMessage(
+        wantCustomerUpload
+          ? "Listing type: Custom Photo Upload (customer can upload their image)."
+          : "Listing type: Ready-Made Prints (your design; no customer photo upload)."
+      );
       await loadProducts();
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Failed to update price");
+      setError(
+        updateError instanceof Error ? updateError.message : "Failed to update listing type"
+      );
+    } finally {
+      setBusyProductId(null);
+    }
+  }
+
+  async function saveProductNameAndPrice(product: ProductSummary) {
+    const nameDraft = (nameDraftByProduct[product.id] ?? "").trim();
+    const priceDraft = (priceDraftByProduct[product.id] ?? "").trim();
+
+    if (!nameDraft) {
+      setError("Name is required");
+      return;
+    }
+
+    const cents = dollarsToCents(priceDraft);
+    if (!cents) {
+      setError("Price must be greater than 0");
+      return;
+    }
+
+    const nameChanged = nameDraft !== product.name;
+    const priceChanged = cents !== product.base_price_cents;
+
+    if (!nameChanged && !priceChanged) {
+      setMessage("No changes to save.");
+      return;
+    }
+
+    setBusyProductId(product.id);
+    setError(null);
+    setMessage(null);
+
+    const body: { name?: string; base_price_cents?: number } = {};
+    if (nameChanged) {
+      body.name = nameDraft;
+    }
+    if (priceChanged) {
+      body.base_price_cents = cents;
+    }
+
+    try {
+      await callAdmin(`/api/admin/products/${product.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+      if (nameChanged && priceChanged) {
+        setMessage("Name and price updated.");
+      } else if (nameChanged) {
+        setMessage("Name updated.");
+      } else {
+        setMessage("Price updated.");
+      }
+      await loadProducts();
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error ? updateError.message : "Failed to update name or price"
+      );
     } finally {
       setBusyProductId(null);
     }
@@ -935,6 +1045,68 @@ export default function AdminPage() {
     await applyStockChange(product, delta, reason);
   }
 
+  async function switchInventoryToLimited(product: ProductSummary) {
+    if (product.inventory_mode === "finite") {
+      return;
+    }
+
+    setBusyProductId(product.id);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await callAdmin(`/api/admin/products/${product.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          inventory_mode: "finite",
+          stock_quantity: product.stock_quantity != null ? Math.max(0, product.stock_quantity) : 1
+        })
+      });
+
+      const initial = product.stock_quantity != null ? Math.max(0, product.stock_quantity) : 1;
+      setStockDraftByProduct((current) => ({
+        ...current,
+        [product.id]: String(initial)
+      }));
+      setMessage("Limited stock enabled — set quantity below.");
+      await loadProducts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not enable limited stock");
+    } finally {
+      setBusyProductId(null);
+    }
+  }
+
+  async function switchInventoryToMadeToOrder(product: ProductSummary) {
+    if (product.inventory_mode !== "finite") {
+      return;
+    }
+
+    setBusyProductId(product.id);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await callAdmin(`/api/admin/products/${product.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          inventory_mode: "made_to_order"
+        })
+      });
+
+      setStockDraftByProduct((current) => ({
+        ...current,
+        [product.id]: ""
+      }));
+      setMessage("Switched to made to order (no tracked stock quantity).");
+      await loadProducts();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not switch to made to order");
+    } finally {
+      setBusyProductId(null);
+    }
+  }
+
   async function deleteProduct(product: ProductSummary) {
     const confirmed = confirmDestructiveAction("DELETE", product.name);
     if (!confirmed) {
@@ -959,10 +1131,10 @@ export default function AdminPage() {
     }
   }
 
-  function setSelectedFile(productId: string, file: File | null) {
+  function setSelectedFilesForProduct(productId: string, files: File[]) {
     setSelectedFiles((current) => ({
       ...current,
-      [productId]: file
+      [productId]: files
     }));
   }
 
@@ -974,48 +1146,54 @@ export default function AdminPage() {
   }
 
   async function uploadProductImage(product: ProductSummary) {
-    const file = selectedFiles[product.id];
-    if (!file) {
-      setError("Choose an image file first.");
+    const files = selectedFiles[product.id] ?? [];
+    if (files.length === 0) {
+      setError("Choose one or more image files first.");
       return;
     }
+
+    const wantPrimaryOnFirst = uploadAsPrimary[product.id] ?? false;
 
     setBusyProductId(product.id);
     setError(null);
     setMessage(null);
 
     try {
-      const uploadInfo = (await callAdmin(`/api/admin/products/${product.id}/images/upload-url`, {
-        method: "POST",
-        body: JSON.stringify({
-          filename: file.name,
-          content_type: file.type || "application/octet-stream"
-        })
-      })) as UploadUrlResponse;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]!;
+        const optimized = await optimizeImageFileForUpload(file);
+        const uploadInfo = (await callAdmin(`/api/admin/products/${product.id}/images/upload-url`, {
+          method: "POST",
+          body: JSON.stringify({
+            filename: optimized.filename,
+            content_type: optimized.contentType
+          })
+        })) as UploadUrlResponse;
 
-      const uploadResponse = await fetch(uploadInfo.uploadUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type || "application/octet-stream"
-        },
-        body: file
-      });
+        const uploadResponse = await fetch(uploadInfo.uploadUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": optimized.contentType
+          },
+          body: optimized.blob
+        });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`Image upload failed (${uploadResponse.status})`);
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed for “${file.name}” (${uploadResponse.status})`);
+        }
+
+        await callAdmin(`/api/admin/products/${product.id}/images`, {
+          method: "POST",
+          body: JSON.stringify({
+            storage_path: uploadInfo.storagePath,
+            is_primary: wantPrimaryOnFirst && i === 0
+          })
+        });
       }
 
-      await callAdmin(`/api/admin/products/${product.id}/images`, {
-        method: "POST",
-        body: JSON.stringify({
-          storage_path: uploadInfo.storagePath,
-          is_primary: uploadAsPrimary[product.id] ?? false
-        })
-      });
-
-      setSelectedFile(product.id, null);
+      setSelectedFilesForProduct(product.id, []);
       setUploadPrimaryFlag(product.id, false);
-      setMessage("Image uploaded.");
+      setMessage(files.length > 1 ? `${files.length} photos uploaded.` : "Image uploaded.");
       await refreshImagesForProduct(product.id);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Failed to upload image");
@@ -1155,6 +1333,60 @@ export default function AdminPage() {
     });
   }, [imagesByProduct, productSearch, productViewFilter, products]);
 
+  async function runBulkAction(
+    actionLabel: string,
+    targets: ProductSummary[],
+    apply: (product: ProductSummary) => Promise<boolean>
+  ) {
+    if (targets.length === 0) {
+      setError(`No matching items for: ${actionLabel}.`);
+      return;
+    }
+
+    const confirmed = window.confirm(`${actionLabel} for ${targets.length} visible item(s)?`);
+    if (!confirmed) {
+      setMessage("Bulk update cancelled.");
+      return;
+    }
+
+    setBulkBusy(true);
+    setError(null);
+    setMessage(null);
+
+    let changed = 0;
+    let alreadySet = 0;
+    let failed = 0;
+
+    for (const product of targets) {
+      try {
+        const didChange = await apply(product);
+        if (didChange) {
+          changed += 1;
+        } else {
+          alreadySet += 1;
+        }
+      } catch {
+        failed += 1;
+      }
+    }
+
+    try {
+      await loadProducts();
+    } finally {
+      setBulkBusy(false);
+    }
+
+    const suffix: string[] = [];
+    suffix.push(`${changed} changed`);
+    if (alreadySet > 0) {
+      suffix.push(`${alreadySet} already set`);
+    }
+    if (failed > 0) {
+      suffix.push(`${failed} failed`);
+    }
+    setMessage(`${actionLabel}: ${suffix.join(", ")}.`);
+  }
+
   return (
     <main className="page-main admin-page">
       <h1>Store dashboard</h1>
@@ -1179,45 +1411,54 @@ export default function AdminPage() {
           </p>
         </div>
         {token ? (
-          <div className="admin-mode-toggle-row" aria-label="Admin section picker">
-            <button
-              type="button"
-              className={`admin-mode-toggle ${adminView === "home" ? "is-active" : ""}`}
-              onClick={() => setAdminView("home")}
-            >
-              Home
-            </button>
-            <button
-              type="button"
-              className={`admin-mode-toggle ${adminView === "add" ? "is-active" : ""}`}
-              onClick={() => setAdminView("add")}
-            >
-              New product
-            </button>
-            <button
-              type="button"
-              className={`admin-mode-toggle ${adminView === "manage" ? "is-active" : ""}`}
-              onClick={() => setAdminView("manage")}
-            >
-              Edit products
-            </button>
-            <button
-              type="button"
-              className={`admin-mode-toggle ${adminView === "shipping" ? "is-active" : ""}`}
-              onClick={() => setAdminView("shipping")}
-            >
-              Shipping
-            </button>
-            <a href="/admin/orders" className="toolbarLink">
-              Orders
-            </a>
-          </div>
+          <p className="admin-note-tight">
+            Use the <strong>sticky bar below</strong> to switch Home, New product, Edit catalog, Shipping,
+            and Orders — it stays handy while you scroll on your phone.
+          </p>
         ) : (
-          <p className="admin-note-tight">Log in to access product and order tools.</p>
+          <>
+            <div className="admin-mode-toggle-row" aria-label="Admin section picker">
+              <button
+                type="button"
+                className={`admin-mode-toggle ${adminView === "home" ? "is-active" : ""}`}
+                onClick={() => setAdminView("home")}
+              >
+                Home
+              </button>
+              <button
+                type="button"
+                className={`admin-mode-toggle ${adminView === "add" ? "is-active" : ""}`}
+                onClick={() => setAdminView("add")}
+              >
+                New product
+              </button>
+              <button
+                type="button"
+                className={`admin-mode-toggle ${adminView === "manage" ? "is-active" : ""}`}
+                onClick={() => setAdminView("manage")}
+              >
+                Edit catalog
+              </button>
+              <button
+                type="button"
+                className={`admin-mode-toggle ${adminView === "shipping" ? "is-active" : ""}`}
+                onClick={() => setAdminView("shipping")}
+              >
+                Shipping
+              </button>
+              <a href="/admin/orders" className="toolbarLink">
+                Orders
+              </a>
+              <a href="/admin/studio-prints" className="toolbarLink">
+                Studio prints
+              </a>
+            </div>
+            <p className="admin-note-tight">
+              Log in to save changes. <strong>Orders</strong> and <strong>Studio prints</strong> open on
+              their own pages—use those links after you sign in.
+            </p>
+          </>
         )}
-        <p className="admin-note-tight">
-          <strong>Orders</strong> live on a separate page — use the Orders tab or link above.
-        </p>
       </section>
 
       <AdminToastStack toasts={toasts} onDismiss={dismissToast} />
@@ -1295,6 +1536,9 @@ export default function AdminPage() {
               <a href="/admin/orders" className="toolbarLink">
                 Orders
               </a>
+              <a href="/admin/studio-prints" className="toolbarLink">
+                Studio prints
+              </a>
             </div>
             <div className="admin-mode-toggle-row">
               <button
@@ -1316,7 +1560,7 @@ export default function AdminPage() {
                 className={`admin-mode-toggle ${adminView === "manage" ? "is-active" : ""}`}
                 onClick={() => setAdminView("manage")}
               >
-                Edit products
+                Edit catalog
               </button>
               <button
                 type="button"
@@ -1401,13 +1645,16 @@ export default function AdminPage() {
                     New product
                   </button>
                   <button type="button" className="admin-hub-action" onClick={() => setAdminView("manage")}>
-                    Edit products (price, photos, stock)
+                    Edit catalog
                   </button>
                   <button type="button" className="admin-hub-action" onClick={() => setAdminView("shipping")}>
                     Shipping rates
                   </button>
                   <a href="/admin/orders" className="toolbarLink admin-hub-action">
                     Orders
+                  </a>
+                  <a href="/admin/studio-prints" className="toolbarLink admin-hub-action">
+                    Studio prints
                   </a>
                 </div>
               </section>
@@ -1469,11 +1716,15 @@ export default function AdminPage() {
                   }}
                 >
                   <option value="handmade_crochet_knit">Handmade Crochet/Knit</option>
-                  <option value="custom_sublimation">Custom Sublimation</option>
+                  <option value="custom_sublimation">Custom Sublimation (mugs, tumblers, prints)</option>
                 </select>
               </label>
+              <p className="admin-note-tight">
+                Printed drinkware and bags belong under Custom Sublimation, not handmade, so the
+                right shop filters apply.
+              </p>
               <label>
-                Price (USD)
+                Price (CAD)
                 <input
                   type="number"
                   min="0.01"
@@ -1500,21 +1751,38 @@ export default function AdminPage() {
               </p>
 
               {category === "custom_sublimation" ? (
-                <>
-                  <label className="inlineToggle">
+                <fieldset className="admin-label-spaced">
+                  <legend>Print listing type</legend>
+                  <p className="admin-note-tight">
+                    This controls which shop tab the product appears under (after you publish it).
+                  </p>
+                  <label className="inlineToggle admin-label-spaced">
                     <input
-                      type="checkbox"
-                      checked={allowCustomerUpload}
-                      onChange={(event) => setAllowCustomerUpload(event.target.checked)}
+                      type="radio"
+                      name="new-product-sublimation-listing"
+                      checked={!allowCustomerUpload}
+                      onChange={() => setAllowCustomerUpload(false)}
                     />
-                    Customer uploads photo
+                    Ready-made print (your design)
                   </label>
                   <p className="admin-note-tight">
-                    {allowCustomerUpload
-                      ? "On: customer uploads a photo for this product."
-                      : "Off: this is your ready-made design, made to order."}
+                    Shop: <strong>Ready-Made Prints</strong>. You provide the artwork; customers do
+                    not upload a photo.
                   </p>
-                </>
+                  <label className="inlineToggle admin-label-spaced">
+                    <input
+                      type="radio"
+                      name="new-product-sublimation-listing"
+                      checked={allowCustomerUpload}
+                      onChange={() => setAllowCustomerUpload(true)}
+                    />
+                    Custom photo upload
+                  </label>
+                  <p className="admin-note-tight">
+                    Shop: <strong>Custom Photo Upload</strong>. The customer uploads their own
+                    image for this product.
+                  </p>
+                </fieldset>
               ) : null}
 
               {trackStock ? (
@@ -1544,6 +1812,45 @@ export default function AdminPage() {
                     No extra details needed for quick setup.
                   </p>
                 )}
+
+                <div className="admin-label-spaced">
+                  <label>
+                    Product photos (optional)
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => {
+                        const next = event.target.files?.length
+                          ? Array.from(event.target.files)
+                          : [];
+                        setCreatePhotoFiles(next);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <p className="admin-note-tight">
+                    Select several files at once (Ctrl+click or Shift+click on desktop).
+                    {createPhotoFiles.length > 0 ? ` ${createPhotoFiles.length} selected.` : ""}
+                  </p>
+                </div>
+                {createPhotoPreviewUrls.length > 0 ? (
+                  <div className="admin-photo-preview-row" aria-live="polite">
+                    {createPhotoPreviewUrls.map((url, index) => (
+                      <div key={`${url}-${index}`} className="admin-create-photo-preview">
+                        <img src={url} alt={`New product photo preview ${index + 1}`} />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <label className="inlineToggle admin-label-spaced">
+                  <input
+                    type="checkbox"
+                    checked={createPhotoAsPrimary}
+                    onChange={(event) => setCreatePhotoAsPrimary(event.target.checked)}
+                  />
+                  Set first uploaded photo as main image
+                </label>
               </details>
 
               <button type="submit" disabled={createBusy}>
@@ -1574,7 +1881,7 @@ export default function AdminPage() {
                   Free shipping enabled
                 </label>
                 <label>
-                  Free shipping threshold (USD)
+                  Free shipping threshold (CAD)
                   <input
                     type="number"
                     min="0"
@@ -1608,7 +1915,7 @@ export default function AdminPage() {
                       autoCapitalize="characters"
                       required
                     />
-                    <span className="admin-field-hint">Use CA or US.</span>
+                    <span className="admin-field-hint">Use CA only.</span>
                     {shippingOriginErrors.country_code ? (
                       <span className="admin-field-error">{shippingOriginErrors.country_code}</span>
                     ) : null}
@@ -1694,7 +2001,7 @@ export default function AdminPage() {
 
               <div className="admin-divider-block">
                 <p className="admin-item-line">
-                  <strong>Zone rates (USD)</strong>
+                  <strong>Zone rates (CAD)</strong>
                 </p>
                 <p className="admin-note-tight">
                   Set 0 if you want free shipping for a zone.
@@ -1719,7 +2026,7 @@ export default function AdminPage() {
                             />
                           </label>
                           <label>
-                            Price (USD)
+                            Price (CAD)
                             <input
                               type="number"
                               min="0"
@@ -1763,9 +2070,10 @@ export default function AdminPage() {
 
           {adminView === "manage" ? (
             <section className="sectionCard" id="manage-items">
-            <h2>Manage Items</h2>
+            <h2>Your catalog</h2>
             <p className="admin-note-tight">
-              Important info is visible first. Open <strong>More controls</strong> only when needed.
+              Main actions are up top on each card. Use <strong>Quick mode</strong> for everyday taps,
+              then switch to <strong>Advanced</strong> when editing lots of details.
             </p>
 
             <div className="admin-orders-stats" role="status" aria-label="Product summary">
@@ -1783,14 +2091,36 @@ export default function AdminPage() {
               </p>
             </div>
 
+            <div className="admin-manage-mode-bar" role="group" aria-label="Catalog editing mode">
+              <button
+                type="button"
+                className={`admin-filter-chip ${manageMode === "quick" ? "is-active" : ""}`}
+                onClick={() => setManageMode("quick")}
+                disabled={bulkBusy}
+              >
+                Quick mode
+              </button>
+              <button
+                type="button"
+                className={`admin-filter-chip ${manageMode === "advanced" ? "is-active" : ""}`}
+                onClick={() => setManageMode("advanced")}
+                disabled={bulkBusy}
+              >
+                Advanced mode
+              </button>
+            </div>
+
             <div className="filterRow">
               <label className="compactLabel">
                 Search
                 <input
                   type="search"
-                  placeholder="Search item name or code"
+                  placeholder="Search name or code"
                   value={productSearch}
                   onChange={(event) => setProductSearch(event.target.value)}
+                  enterKeyHint="search"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
               </label>
 
@@ -1814,6 +2144,113 @@ export default function AdminPage() {
               <button type="button" onClick={() => void loadProducts()} disabled={loadingProducts}>
                 {loadingProducts ? "Refreshing..." : "Refresh"}
               </button>
+            </div>
+
+            <div className="admin-bulk-actions" aria-label="Bulk actions for visible products">
+              <p className="admin-note-tight">
+                Bulk actions apply to the current filtered list ({visibleProducts.length} visible).
+              </p>
+              <div className="actionGrid actionGridTight">
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() =>
+                    void runBulkAction(
+                      "Publish visible items",
+                      visibleProducts.filter((p) => p.status !== "published"),
+                      async (product) => {
+                        if (product.status === "published") {
+                          return false;
+                        }
+                        await callAdmin(`/api/admin/products/${product.id}/publish`, { method: "POST" });
+                        return true;
+                      }
+                    )
+                  }
+                >
+                  {bulkBusy ? "Working..." : "Publish visible"}
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() =>
+                    void runBulkAction(
+                      "Show visible items",
+                      visibleProducts.filter((p) => !p.is_available),
+                      async (product) => {
+                        if (product.is_available) {
+                          return false;
+                        }
+                        await callAdmin(`/api/admin/products/${product.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({ is_available: true })
+                        });
+                        return true;
+                      }
+                    )
+                  }
+                >
+                  {bulkBusy ? "Working..." : "Show visible"}
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() =>
+                    void runBulkAction(
+                      "Set ready-made listing",
+                      visibleProducts.filter((p) => p.category === "custom_sublimation"),
+                      async (product) => {
+                        const currentMode = product.custom_sublimation_details?.allow_image_upload;
+                        if (currentMode !== true) {
+                          return false;
+                        }
+                        await callAdmin(`/api/admin/products/${product.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({
+                            custom_sublimation_details: {
+                              allow_image_upload: false,
+                              allow_text_overlay: false,
+                              max_text_layers: 0
+                            }
+                          })
+                        });
+                        return true;
+                      }
+                    )
+                  }
+                >
+                  {bulkBusy ? "Working..." : "Visible → ready-made"}
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() =>
+                    void runBulkAction(
+                      "Set custom upload listing",
+                      visibleProducts.filter((p) => p.category === "custom_sublimation"),
+                      async (product) => {
+                        const currentMode = product.custom_sublimation_details?.allow_image_upload;
+                        if (currentMode !== false) {
+                          return false;
+                        }
+                        await callAdmin(`/api/admin/products/${product.id}`, {
+                          method: "PATCH",
+                          body: JSON.stringify({
+                            custom_sublimation_details: {
+                              allow_image_upload: true,
+                              allow_text_overlay: true,
+                              max_text_layers: 3
+                            }
+                          })
+                        });
+                        return true;
+                      }
+                    )
+                  }
+                >
+                  {bulkBusy ? "Working..." : "Visible → custom upload"}
+                </button>
+              </div>
             </div>
             <p className="admin-note-spaced">
               Showing {visibleProducts.length} of {products.length} products.
@@ -1880,6 +2317,12 @@ export default function AdminPage() {
                           ${(product.base_price_cents / 100).toFixed(2)} {product.currency} • {stockSummary} • Photos{" "}
                           {imageCount}
                         </p>
+                        {product.inventory_mode === "made_to_order" ? (
+                          <p className="admin-note-tight">
+                            To set a quantity on hand: open{" "}
+                            <strong>More controls</strong> → <strong>Enable limited stock</strong>.
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
@@ -1895,7 +2338,7 @@ export default function AdminPage() {
 
                     {product.category === "custom_sublimation" ? (
                       <p className="admin-item-line-muted">
-                        Mode:{" "}
+                        Shop listing:{" "}
                         {product.custom_sublimation_details ? (
                           <span
                             className={`admin-badge ${
@@ -1910,6 +2353,42 @@ export default function AdminPage() {
                           <span className="admin-badge is-danger">Missing setup</span>
                         )}
                       </p>
+                    ) : null}
+
+                    {product.status === "draft" ? (
+                      <p className="admin-note-tight">
+                        Draft items are hidden from the shop — tap Publish below when you are ready.
+                      </p>
+                    ) : null}
+
+                    {product.category === "custom_sublimation" && product.custom_sublimation_details ? (
+                      <div className="admin-label-spaced">
+                        <p className="admin-item-line-muted">
+                          <strong>Shop shelf</strong> — Ready-made prints vs custom photo upload
+                        </p>
+                        <div className="admin-listing-type-row" role="group" aria-label="Shop listing type">
+                          <button
+                            type="button"
+                            onClick={() => void setSublimationListingMode(product, "ready_made_print")}
+                            disabled={
+                              busyProductId === product.id ||
+                              !product.custom_sublimation_details.allow_image_upload
+                            }
+                          >
+                            Ready-made
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void setSublimationListingMode(product, "customer_photo_upload")}
+                            disabled={
+                              busyProductId === product.id ||
+                              product.custom_sublimation_details.allow_image_upload
+                            }
+                          >
+                            Custom upload
+                          </button>
+                        </div>
+                      </div>
                     ) : null}
 
                     <div className="actionGrid is-center actionGridTight">
@@ -1951,50 +2430,92 @@ export default function AdminPage() {
                       ) : null}
                     </div>
 
-                    <details className="admin-details admin-divider-top">
-                      <summary className="admin-details-summary">More controls</summary>
-                      <div className="admin-details-body">
-                        {product.category === "custom_sublimation" ? (
+                    {manageMode === "advanced" ? (
+                      <details className="admin-details admin-divider-top">
+                        <summary className="admin-details-summary">More controls</summary>
+                        <div className="admin-details-body">
+                        <div className="admin-label-spaced">
+                          <p className="admin-item-line-muted">
+                            <strong>Inventory</strong>: {formatInventoryMode(product.inventory_mode)}
+                            {product.inventory_mode === "made_to_order"
+                              ? " — no numbered stock box until you enable limited stock."
+                              : " — edit quantity below."}
+                          </p>
                           <div className="actionGrid actionGridTight">
                             <button
                               type="button"
-                              onClick={() => void toggleSublimationMode(product)}
+                              onClick={() => void switchInventoryToLimited(product)}
                               disabled={
-                                busyProductId === product.id || !product.custom_sublimation_details
+                                busyProductId === product.id || product.inventory_mode === "finite"
                               }
                             >
-                              {product.custom_sublimation_details?.allow_image_upload
-                                ? "Set as ready-made design"
-                                : "Require customer upload"}
+                              Enable limited stock
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void switchInventoryToMadeToOrder(product)}
+                              disabled={
+                                busyProductId === product.id ||
+                                product.inventory_mode !== "finite"
+                              }
+                            >
+                              Switch to made to order (no fixed stock)
                             </button>
                           </div>
-                        ) : null}
+                        </div>
 
-                        <div className="priceEditor">
-                          <label className="compactLabel">
-                            Price (USD)
-                            <input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={priceDraftByProduct[product.id] ?? ""}
-                              onChange={(event) =>
-                                setPriceDraftByProduct((current) => ({
-                                  ...current,
-                                  [product.id]: event.target.value
-                                }))
-                              }
-                              inputMode="decimal"
-                            />
-                          </label>
+                        <div className="admin-product-basics-editor">
+                          <div className="admin-product-basics-row">
+                            <label className="compactLabel">
+                              Product name
+                              <input
+                                value={nameDraftByProduct[product.id] ?? ""}
+                                onChange={(event) =>
+                                  setNameDraftByProduct((current) => ({
+                                    ...current,
+                                    [product.id]: event.target.value
+                                  }))
+                                }
+                                autoComplete="off"
+                              />
+                            </label>
+                            <label className="compactLabel">
+                              Price (CAD)
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={priceDraftByProduct[product.id] ?? ""}
+                                onChange={(event) =>
+                                  setPriceDraftByProduct((current) => ({
+                                    ...current,
+                                    [product.id]: event.target.value
+                                  }))
+                                }
+                                inputMode="decimal"
+                              />
+                            </label>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => void updatePrice(product)}
+                            className="admin-primary-action"
+                            onClick={() => void saveProductNameAndPrice(product)}
                             disabled={busyProductId === product.id}
                           >
-                            Save price
+                            Save name &amp; price
                           </button>
                         </div>
+
+                        <AdminProductVariantsPanel
+                          productId={product.id}
+                          basePriceCents={product.base_price_cents}
+                          currency={product.currency}
+                          callAdmin={callAdmin}
+                          disabled={busyProductId === product.id}
+                          onNotify={pushToast}
+                          images={imagesByProduct[product.id] ?? []}
+                          onImageVariantChange={() => void refreshImagesForProduct(product.id)}
+                        />
 
                         {product.inventory_mode === "finite" ? (
                           <>
@@ -2051,11 +2572,21 @@ export default function AdminPage() {
                             <input
                               type="file"
                               accept="image/*"
+                              multiple
                               onChange={(event) => {
-                                const file = event.target.files?.[0] ?? null;
-                                setSelectedFile(product.id, file);
+                                const next = event.target.files?.length
+                                  ? Array.from(event.target.files)
+                                  : [];
+                                setSelectedFilesForProduct(product.id, next);
+                                event.target.value = "";
                               }}
                             />
+                            {(selectedFiles[product.id] ?? []).length > 0 ? (
+                              <span className="admin-note-tight">
+                                {(selectedFiles[product.id] ?? []).length} photo
+                                {(selectedFiles[product.id] ?? []).length === 1 ? "" : "s"} selected
+                              </span>
+                            ) : null}
                             <label className="inlineToggle">
                               <input
                                 type="checkbox"
@@ -2064,14 +2595,14 @@ export default function AdminPage() {
                                   setUploadPrimaryFlag(product.id, event.target.checked)
                                 }
                               />
-                              Use as main photo
+                              Use first selected as main photo
                             </label>
                             <button
                               type="button"
                               onClick={() => void uploadProductImage(product)}
                               disabled={busyProductId === product.id}
                             >
-                              Upload photo
+                              Upload photos
                             </button>
                             <button
                               type="button"
@@ -2089,6 +2620,15 @@ export default function AdminPage() {
                                   {image.storage_path}
                                   {image.is_primary ? " (primary)" : ""}
                                 </span>
+                                {image.signed_url ? (
+                                  <img
+                                    className="admin-image-thumb"
+                                    src={image.signed_url}
+                                    alt={image.alt_text ?? `${product.name} photo thumbnail`}
+                                  />
+                                ) : (
+                                  <span className="admin-image-thumb admin-image-thumb-empty">No preview</span>
+                                )}
                                 {!image.is_primary ? (
                                   <button
                                     type="button"
@@ -2111,18 +2651,23 @@ export default function AdminPage() {
                           {imageCount === 0 ? <p className="admin-note-spaced">No images yet.</p> : null}
                         </div>
 
-                        <div className="admin-divider-block">
-                          <button
-                            type="button"
-                            onClick={() => void deleteProduct(product)}
-                            disabled={busyProductId === product.id}
-                            className="dangerButton"
-                          >
-                            Delete item
-                          </button>
+                          <div className="admin-divider-block">
+                            <button
+                              type="button"
+                              onClick={() => void deleteProduct(product)}
+                              disabled={busyProductId === product.id}
+                              className="dangerButton"
+                            >
+                              Delete item
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </details>
+                      </details>
+                    ) : (
+                      <p className="admin-note-tight">
+                        Need full editing tools for this item? Switch to <strong>Advanced mode</strong>.
+                      </p>
+                    )}
                   </li>
                 );
               })}

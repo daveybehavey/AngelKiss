@@ -21,7 +21,7 @@ export default function ShippingPolicyPage() {
       <section className="panel page-intro">
         <h1 className="page-title">Shipping Policy</h1>
         <p className="page-lead">
-          We pack with care from Vancouver Island and ship across Canada and the USA.
+          We pack with care from Vancouver Island and ship across Canada.
         </p>
       </section>
 
@@ -29,7 +29,6 @@ export default function ShippingPolicyPage() {
         <h2>Where We Ship</h2>
         <ul className="policy-list">
           <li>Canada (local, regional, and national zones)</li>
-          <li>United States (tracked shipping)</li>
         </ul>
       </section>
 

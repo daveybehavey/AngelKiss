@@ -35,6 +35,7 @@ type CustomSublimationDetails = {
   safe_area_height: number;
   max_upload_mb: number;
   allow_image_upload: boolean;
+  allow_gallery_selection: boolean;
   allow_text_overlay: boolean;
   max_text_layers: number;
   allowed_fonts: string[];
@@ -44,6 +45,7 @@ type CustomSublimationDetails = {
 
 type CustomSublimationSummaryDetails = {
   allow_image_upload: boolean;
+  allow_gallery_selection: boolean;
 };
 
 type HandmadeDetails = {
@@ -210,7 +212,7 @@ export async function listAdminProducts(
   if (customProductIds.length > 0) {
     const { data: customDetails, error: customDetailsError } = await supabase
       .from("custom_sublimation_products")
-      .select("product_id,allow_image_upload")
+      .select("product_id,allow_image_upload,allow_gallery_selection")
       .in("product_id", customProductIds);
 
     if (customDetailsError) {
@@ -225,9 +227,11 @@ export async function listAdminProducts(
     for (const row of (customDetails ?? []) as Array<{
       product_id: string;
       allow_image_upload: boolean;
+      allow_gallery_selection?: boolean;
     }>) {
       customDetailsByProductId.set(row.product_id, {
-        allow_image_upload: row.allow_image_upload
+        allow_image_upload: row.allow_image_upload,
+        allow_gallery_selection: row.allow_gallery_selection ?? false
       });
     }
   }

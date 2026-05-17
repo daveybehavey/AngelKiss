@@ -1,10 +1,12 @@
 "use client";
 
+import { AdminSubnav } from "@/components/admin/admin-subnav";
 import {
   AdminToastStack,
   type AdminToast,
   type AdminToastKind
 } from "@/components/admin/toast-stack";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -67,23 +69,23 @@ type OrdersResponse = {
   nextCursor: string | null;
 };
 
-const ACTIONABLE_STATUSES: OrderStatus[] = [
-  "ready_to_ship",
-  "paid",
-  "in_production"
-];
+type OrderScopeFilter = "active" | "open" | "finished" | "all";
 
-const ACTIONABLE_PRIORITY: Record<OrderStatus, number> = {
-  ready_to_ship: 0,
-  paid: 1,
-  in_production: 2,
-  pending_payment: 10,
-  shipped: 11,
-  delivered: 12,
-  canceled: 13,
-  refunded: 14,
-  payment_failed: 15
-};
+type OrderSortKey =
+  | "updated_desc"
+  | "updated_asc"
+  | "number_asc"
+  | "number_desc"
+  | "email_asc"
+  | "email_desc";
+
+/** Paid / making / ready to pack — primary work queue */
+const ACTIVE_QUEUE_STATUSES: OrderStatus[] = ["paid", "in_production", "ready_to_ship"];
+
+/** Includes unpaid checkout attempts */
+const OPEN_PIPELINE_STATUSES: OrderStatus[] = ["pending_payment", ...ACTIVE_QUEUE_STATUSES];
+
+const FINISHED_STATUSES: OrderStatus[] = ["shipped", "delivered", "refunded"];
 
 const NEXT_ORDER_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   paid: "in_production",
@@ -379,6 +381,8 @@ export default function AdminOrdersPage() {
   const [shipTrackingNumberDraft, setShipTrackingNumberDraft] = useState<Record<string, string>>({});
 
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [orderScope, setOrderScope] = useState<OrderScopeFilter>("active");
+  const [orderSort, setOrderSort] = useState<OrderSortKey>("updated_desc");
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -440,7 +444,7 @@ export default function AdminOrdersPage() {
     setError(null);
 
     try {
-      const response = (await callAdmin("/api/admin/orders?limit=100")) as OrdersResponse;
+      const response = (await callAdmin("/api/admin/orders?limit=250")) as OrdersResponse;
       setOrders(response.items ?? []);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load orders");
@@ -667,20 +671,40 @@ export default function AdminOrdersPage() {
     popup.print();
   }
 
-  const actionableOrders = useMemo(() => {
-    return [...orders]
-      .filter((order) => ACTIONABLE_STATUSES.includes(order.status))
-      .sort((left, right) => {
-        const priorityDelta = ACTIONABLE_PRIORITY[left.status] - ACTIONABLE_PRIORITY[right.status];
-        if (priorityDelta !== 0) {
-          return priorityDelta;
-        }
-        return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+  const filteredOrders = useMemo(() => {
+    let list = [...orders];
+    if (orderScope === "active") {
+      list = list.filter((order) => ACTIVE_QUEUE_STATUSES.includes(order.status));
+    } else if (orderScope === "open") {
+      list = list.filter((order) => OPEN_PIPELINE_STATUSES.includes(order.status));
+    } else if (orderScope === "finished") {
+      list = list.filter((order) => FINISHED_STATUSES.includes(order.status));
+    }
+
+    list.sort((left, right) => {
+      if (orderSort === "updated_desc" || orderSort === "updated_asc") {
+        const a = new Date(left.updated_at).getTime();
+        const b = new Date(right.updated_at).getTime();
+        const delta = b - a;
+        return orderSort === "updated_desc" ? delta : -delta;
+      }
+      if (orderSort === "number_asc" || orderSort === "number_desc") {
+        const delta = left.order_number - right.order_number;
+        return orderSort === "number_asc" ? delta : -delta;
+      }
+      const cmp = left.customer_email.localeCompare(right.customer_email, undefined, {
+        sensitivity: "base"
       });
-  }, [orders]);
+      return orderSort === "email_asc" ? cmp : -cmp;
+    });
+
+    return list;
+  }, [orders, orderScope, orderSort]);
 
   const queueCounts = useMemo(() => {
-    return actionableOrders.reduce(
+    return orders
+      .filter((order) => ACTIVE_QUEUE_STATUSES.includes(order.status))
+      .reduce(
       (counts, order) => {
         if (order.status === "paid") {
           counts.paid += 1;
@@ -697,21 +721,22 @@ export default function AdminOrdersPage() {
         readyToShip: 0
       }
     );
-  }, [actionableOrders]);
+  }, [orders]);
 
   return (
     <main className="page-main admin-page">
       <h1>Orders</h1>
       <p className="admin-lead">Start at the top and move each order to the next step.</p>
-      <p className="admin-link-row">
-        <a href="/admin">Back to item manager</a>
-      </p>
+      <AdminSubnav current="orders" />
 
       <AdminToastStack toasts={toasts} onDismiss={dismissToast} />
 
       {!token ? (
         <section className="sectionCard">
           <h2>Sign In</h2>
+          <p className="admin-note-tight">
+            <Link href="/admin">← Back to item manager</Link>
+          </p>
           <form onSubmit={handleSignIn} className="formGrid authForm">
             <label>
               Email
@@ -755,13 +780,42 @@ export default function AdminOrdersPage() {
           </section>
 
           <section className="sectionCard">
-            <h2>Pack &amp; Print Queue</h2>
+            <h2>Orders</h2>
             <p className="admin-note-tight">
-              Showing only <strong>Paid</strong>, <strong>In Production</strong>, and{" "}
-              <strong>Ready to Ship</strong>.
+              Filter the list below. <strong>Active queue</strong> is the usual packing view (paid →
+              ready to ship). Use <strong>Finished</strong> for shipped and delivered history.
             </p>
+            <div className="filterRow">
+              <label className="compactLabel">
+                Show
+                <select
+                  value={orderScope}
+                  onChange={(event) => setOrderScope(event.target.value as OrderScopeFilter)}
+                >
+                  <option value="active">Active queue (paid / in production / ready to ship)</option>
+                  <option value="open">Open pipeline (+ unpaid checkout)</option>
+                  <option value="finished">Finished (shipped / delivered / refunded)</option>
+                  <option value="all">All orders</option>
+                </select>
+              </label>
+              <label className="compactLabel">
+                Sort
+                <select
+                  value={orderSort}
+                  onChange={(event) => setOrderSort(event.target.value as OrderSortKey)}
+                >
+                  <option value="updated_desc">Last modified (newest first)</option>
+                  <option value="updated_asc">Last modified (oldest first)</option>
+                  <option value="number_desc">Order # (high → low)</option>
+                  <option value="number_asc">Order # (low → high)</option>
+                  <option value="email_asc">Customer email (A → Z)</option>
+                  <option value="email_desc">Customer email (Z → A)</option>
+                </select>
+              </label>
+            </div>
             <p className="admin-note-tight">
-              {actionableOrders.length} order(s) need your attention right now.
+              {filteredOrders.length} order(s) in this view
+              {orderScope === "active" ? " — work these first when you are packing." : "."}
             </p>
             <div className="admin-orders-stats" role="status" aria-label="Queue summary">
               <p className="admin-orders-stat">
@@ -780,13 +834,14 @@ export default function AdminOrdersPage() {
             {loadingOrders ? <p className="admin-note-tight">Loading queue...</p> : null}
 
             <ul className="admin-card-list">
-              {actionableOrders.map((order) => {
+              {filteredOrders.map((order) => {
                 const detail = orderDetails[order.id];
                 const expanded = expandedOrderIds[order.id] ?? false;
                 const nextStatus = getNextOrderStatus(order.status);
                 const hasPrimaryMoveAction =
                   nextStatus !== null && nextStatus !== "shipped" && order.status !== "ready_to_ship";
                 const createdDateLabel = formatDateTime(order.created_at);
+                const updatedDateLabel = formatDateTime(order.updated_at);
 
                 return (
                   <li key={order.id} className="itemCard">
@@ -804,7 +859,7 @@ export default function AdminOrdersPage() {
                     </a>
                     <p className="admin-order-meta">
                       {formatMoney(order.total_cents, order.currency)} • {order.item_count} item(s) • Placed{" "}
-                      {createdDateLabel}
+                      {createdDateLabel} • Updated {updatedDateLabel}
                     </p>
                     <p className="admin-item-line-muted">
                       Ship to: {order.shipping_destination ?? "Open details to view destination"}
@@ -1014,9 +1069,10 @@ export default function AdminOrdersPage() {
               })}
             </ul>
 
-            {!loadingOrders && actionableOrders.length === 0 ? (
+            {!loadingOrders && filteredOrders.length === 0 ? (
               <p className="admin-note">
-                No active orders right now. New paid orders will appear here automatically.
+                No orders in this view. Try another filter, refresh, or check back after new
+                checkout activity.
               </p>
             ) : null}
           </section>

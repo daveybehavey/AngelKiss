@@ -1,7 +1,6 @@
 import { badRequest, serverError } from "@/lib/http/json";
+import { loadCachedListPublicProductsForApi } from "@/lib/server/storefront-data-cache";
 import { type ProductCategory } from "@/lib/admin/products";
-import { listPublicProducts } from "@/lib/storefront/products";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -30,16 +29,9 @@ export async function GET(request: Request) {
       return badRequest("Invalid query", parsed.error.flatten());
     }
 
-    const supabase = getSupabaseAdminClient();
-    const category = parsed.data.category as ProductCategory | undefined;
-    const sublimationMode =
-      category === "custom_sublimation" ||
-      (category === undefined && parsed.data.sublimation_mode !== undefined)
-        ? parsed.data.sublimation_mode
-        : undefined;
-    const result = await listPublicProducts(supabase, {
-      category: category ?? (sublimationMode ? "custom_sublimation" : undefined),
-      sublimationMode,
+    const result = await loadCachedListPublicProductsForApi({
+      category: parsed.data.category as ProductCategory | undefined,
+      sublimation_mode: parsed.data.sublimation_mode,
       q: parsed.data.q,
       limit: parsed.data.limit,
       cursor: parsed.data.cursor
@@ -48,7 +40,7 @@ export async function GET(request: Request) {
     return NextResponse.json(result, {
       status: 200,
       headers: {
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120"
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600"
       }
     });
   } catch (error) {

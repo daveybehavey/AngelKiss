@@ -224,7 +224,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const itemCount = useMemo(() => cartItemCount(items), [items]);
   const subtotalCents = useMemo(() => cartSubtotalCents(items), [items]);
-  const currency = items[0]?.currency ?? "USD";
+  const currency = items[0]?.currency ?? "CAD";
 
   const contextValue = useMemo(
     () => ({

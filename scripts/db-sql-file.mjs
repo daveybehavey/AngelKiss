@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { envPath, loadEnvFile } from "./lib/load-env-file.mjs";
+import { resolveRemotePostgresUrl } from "./lib/supabase-remote-db-url.mjs";
 
 /**
  * Split migration SQL into single statements for `supabase db query` (one prepared statement each).
@@ -28,12 +28,6 @@ function escapeCmdDoubleQuotes(s) {
   return s.replace(/"/g, '\\"');
 }
 
-const path = envPath();
-if (!existsSync(path)) {
-  console.error("db-sql-file: no .env.local");
-  process.exit(1);
-}
-
 const rel = process.argv[2] || "supabase/migrations/202604130001_newsletter_subscribers.sql";
 const file = resolve(process.cwd(), rel);
 if (!existsSync(file)) {
@@ -41,23 +35,7 @@ if (!existsSync(file)) {
   process.exit(1);
 }
 
-const e = loadEnvFile(path);
-const supabaseUrl = e.NEXT_PUBLIC_SUPABASE_URL?.trim();
-const password = e.SUPABASE_DB_PASSWORD?.trim();
-if (!supabaseUrl || !password) {
-  console.error("db-sql-file: need NEXT_PUBLIC_SUPABASE_URL and SUPABASE_DB_PASSWORD");
-  process.exit(1);
-}
-
-const hostMatch = supabaseUrl.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co\/?$/i);
-if (!hostMatch) {
-  console.error("db-sql-file: invalid NEXT_PUBLIC_SUPABASE_URL");
-  process.exit(1);
-}
-
-const ref = hostMatch[1];
-const encoded = encodeURIComponent(password);
-const dbUrl = `postgresql://postgres:${encoded}@db.${ref}.supabase.co:5432/postgres`;
+const dbUrl = resolveRemotePostgresUrl("db-sql-file");
 
 const sql = readFileSync(file, "utf8");
 const statements = splitSqlForSupabaseQuery(sql);

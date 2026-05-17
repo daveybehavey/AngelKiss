@@ -1,0 +1,4 @@
+name,slug,category,price_cad,track_stock,stock,listing,publish
+Example Ready Tumbler,example-ready-tumbler,custom_sublimation,32.99,false,,ready_made,false
+Example Custom Mug,,custom_sublimation,28.00,false,,customer_upload,false
+Example Scarf,example-scarf,handmade_crochet_knit,45.00,true,3,,false

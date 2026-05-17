@@ -1,7 +1,7 @@
 import { assertAdminFromRequest } from "@/lib/auth/admin";
-import { getProductImagesBucket, normalizeStoragePathForBucket } from "@/lib/admin/images";
 import { getAdminProductRow } from "@/lib/admin/products";
 import { badRequest, notFound, serverError, unauthorized } from "@/lib/http/json";
+import { deleteCatalogMediaObject } from "@/lib/server/catalog-media-storage";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,7 +12,8 @@ const patchBodySchema = z
   .object({
     alt_text: z.string().nullable().optional(),
     sort_order: z.number().int().nonnegative().optional(),
-    is_primary: z.boolean().optional()
+    is_primary: z.boolean().optional(),
+    variant_id: z.string().uuid().nullable().optional()
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field is required"
@@ -68,10 +69,26 @@ export async function PATCH(
       }
     }
 
+    if (parsed.data.variant_id) {
+      const { data: variantRow, error: variantError } = await supabase
+        .from("product_variants")
+        .select("id")
+        .eq("id", parsed.data.variant_id)
+        .eq("product_id", id)
+        .maybeSingle();
+      if (variantError) {
+        return badRequest(variantError.message);
+      }
+      if (!variantRow) {
+        return badRequest("variant_id does not belong to this product");
+      }
+    }
+
     const updates: Record<string, unknown> = {};
     if (parsed.data.alt_text !== undefined) updates.alt_text = parsed.data.alt_text;
     if (parsed.data.sort_order !== undefined) updates.sort_order = parsed.data.sort_order;
     if (parsed.data.is_primary !== undefined) updates.is_primary = parsed.data.is_primary;
+    if (parsed.data.variant_id !== undefined) updates.variant_id = parsed.data.variant_id;
 
     const { data, error } = await supabase
       .from("product_images")
@@ -135,9 +152,7 @@ export async function DELETE(
       return badRequest(deleteError.message);
     }
 
-    const bucket = getProductImagesBucket();
-    const normalizedPath = normalizeStoragePathForBucket(image.storage_path, bucket);
-    await supabase.storage.from(bucket).remove([normalizedPath]);
+    await deleteCatalogMediaObject(supabase, image.storage_path);
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

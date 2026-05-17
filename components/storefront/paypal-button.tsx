@@ -28,13 +28,15 @@ export type PayPalCaptureSuccess = {
 type PayPalButtonProps = {
   checkoutSessionId: string;
   onSuccess: (result: PayPalCaptureSuccess) => void;
+  /** Release inventory hold when shopper closes PayPal without paying. */
+  onCancel?: () => void;
 };
 
 let paypalScriptPromise: Promise<void> | null = null;
 
 function getPublicPayPalClientId(): string | null {
-  const value = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID?.trim();
-  return value && value.length > 0 ? value : null;
+  const value = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID?.trim() ?? "";
+  return value.length > 0 ? value : null;
 }
 
 function ensurePayPalScript(clientId: string): Promise<void> {
@@ -60,7 +62,7 @@ function ensurePayPalScript(clientId: string): Promise<void> {
 
     const script = document.createElement("script");
     script.id = "paypal-js-sdk";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture`;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=CAD&intent=capture`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Failed to load PayPal SDK"));
@@ -70,14 +72,14 @@ function ensurePayPalScript(clientId: string): Promise<void> {
   return paypalScriptPromise;
 }
 
-export function PayPalButton({ checkoutSessionId, onSuccess }: PayPalButtonProps) {
+export function PayPalButton({ checkoutSessionId, onSuccess, onCancel }: PayPalButtonProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const clientId = getPublicPayPalClientId();
     if (!clientId) {
-      setError("Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID");
+      setError("Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID (use the client id for your current PAYPAL_ENV)");
       return;
     }
     const resolvedClientId: string = clientId;
@@ -143,7 +145,8 @@ export function PayPalButton({ checkoutSessionId, onSuccess }: PayPalButtonProps
             setError(callbackError instanceof Error ? callbackError.message : "PayPal checkout failed");
           },
           onCancel: () => {
-            setError("Payment cancelled.");
+            onCancel?.();
+            setError("Payment cancelled. Your cart is still saved — you can try again.");
           }
         });
 
@@ -160,7 +163,7 @@ export function PayPalButton({ checkoutSessionId, onSuccess }: PayPalButtonProps
     return () => {
       cancelled = true;
     };
-  }, [checkoutSessionId, onSuccess]);
+  }, [checkoutSessionId, onSuccess, onCancel]);
 
   return (
     <section className="paypal-panel">

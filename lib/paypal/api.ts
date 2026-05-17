@@ -49,11 +49,20 @@ function getPayPalBaseUrl(): string {
 
 function getPayPalClientId(): string {
   const direct = process.env.PAYPAL_CLIENT_ID?.trim();
+  const liveClientId = process.env.PAYPAL_LIVE_CLIENT_ID?.trim();
+  const sandboxClientId = process.env.PAYPAL_SANDBOX_CLIENT_ID?.trim();
   const testClientId = process.env.PAYPAL_TEST_CLIENT_ID?.trim();
+  const devClientId = process.env.PAYPAL_CLIENTS_DEV_CLIENT?.trim();
   const publicClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID?.trim();
   if (getPayPalMode() === "sandbox") {
+    if (sandboxClientId) {
+      return sandboxClientId;
+    }
     if (testClientId) {
       return testClientId;
+    }
+    if (devClientId) {
+      return devClientId;
     }
     if (direct) {
       return direct;
@@ -62,32 +71,47 @@ function getPayPalClientId(): string {
       return publicClientId;
     }
   } else {
+    if (liveClientId) {
+      return liveClientId;
+    }
     if (direct) {
       return direct;
-    }
-    if (testClientId) {
-      return testClientId;
     }
     if (publicClientId) {
       return publicClientId;
     }
+    if (testClientId) {
+      return testClientId;
+    }
   }
   throw new Error(
-    "Missing required environment variable: PAYPAL_CLIENT_ID, PAYPAL_TEST_CLIENT_ID, or NEXT_PUBLIC_PAYPAL_CLIENT_ID"
+    "Missing PayPal client id: set PAYPAL_LIVE_CLIENT_ID / PAYPAL_CLIENT_ID (live), PAYPAL_SANDBOX_CLIENT_ID / PAYPAL_TEST_CLIENT_ID (sandbox), or NEXT_PUBLIC_PAYPAL_CLIENT_ID"
   );
 }
 
 function getPayPalClientSecret(): string {
   const direct = process.env.PAYPAL_CLIENT_SECRET?.trim();
+  const liveSecret = process.env.PAYPAL_LIVE_CLIENT_SECRET?.trim();
+  const sandboxSecret = process.env.PAYPAL_SANDBOX_CLIENT_SECRET?.trim();
   const testSecret = process.env.PAYPAL_TEST_CLIENT_SECRET?.trim();
+  const devSecret = process.env.PAYPAL_CLIENTS_DEV_SECRET?.trim();
   if (getPayPalMode() === "sandbox") {
+    if (sandboxSecret) {
+      return sandboxSecret;
+    }
     if (testSecret) {
       return testSecret;
+    }
+    if (devSecret) {
+      return devSecret;
     }
     if (direct) {
       return direct;
     }
   } else {
+    if (liveSecret) {
+      return liveSecret;
+    }
     if (direct) {
       return direct;
     }
@@ -95,7 +119,9 @@ function getPayPalClientSecret(): string {
       return testSecret;
     }
   }
-  throw new Error("Missing required environment variable: PAYPAL_CLIENT_SECRET or PAYPAL_TEST_CLIENT_SECRET");
+  throw new Error(
+    "Missing PayPal client secret: set PAYPAL_LIVE_CLIENT_SECRET / PAYPAL_CLIENT_SECRET (live), PAYPAL_SANDBOX_CLIENT_SECRET / PAYPAL_TEST_CLIENT_SECRET (sandbox)"
+  );
 }
 
 function getBasicAuthHeader(): string {

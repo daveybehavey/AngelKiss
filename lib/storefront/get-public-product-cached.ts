@@ -1,15 +1,14 @@
+import { loadCachedPublicProductBySlug } from "@/lib/server/storefront-data-cache";
 import { cache } from "react";
-import { getPublicProductBySlug } from "@/lib/storefront/products";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Deduplicates Supabase work when `generateMetadata` and the page both need the same product.
+ * Deduplicates Supabase work when `generateMetadata` and the page both need the same product,
+ * and **reuses signed image URLs across requests** via Next `unstable_cache` (lower Supabase egress).
  * Pass a **trimmed, lowercased** slug from call sites so the cache key is stable.
  */
-export const getPublicProductBySlugCached = cache(async (normalizedSlug: string) => {
+export const getPublicProductBySlugCached = cache((normalizedSlug: string) => {
   if (!normalizedSlug) {
-    return null;
+    return Promise.resolve(null);
   }
-  const supabase = getSupabaseAdminClient();
-  return getPublicProductBySlug(supabase, normalizedSlug);
+  return loadCachedPublicProductBySlug(normalizedSlug);
 });

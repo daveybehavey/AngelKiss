@@ -1,7 +1,7 @@
 import { assertAdminFromRequest } from "@/lib/auth/admin";
-import { getProductImagesBucket, normalizeStoragePathForBucket } from "@/lib/admin/images";
 import { getAdminProductRow } from "@/lib/admin/products";
 import { badRequest, notFound, serverError, unauthorized } from "@/lib/http/json";
+import { resolveStorefrontProductImageReadUrls } from "@/lib/storefront/storefront-media-url";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,7 +12,8 @@ const bodySchema = z.object({
   storage_path: z.string().min(1),
   alt_text: z.string().nullable().optional(),
   sort_order: z.number().int().nonnegative().optional().default(0),
-  is_primary: z.boolean().optional().default(false)
+  is_primary: z.boolean().optional().default(false),
+  variant_id: z.string().uuid().nullable().optional()
 });
 
 export async function GET(
@@ -46,35 +47,16 @@ export async function GET(
     }
 
     const images = data ?? [];
-    const bucket = getProductImagesBucket();
-    const normalizedPaths = images
-      .map((image) => normalizeStoragePathForBucket(image.storage_path, bucket))
-      .filter((path) => path.length > 0);
+    const signedUrlByPath = await resolveStorefrontProductImageReadUrls(
+      supabase,
+      images.map((image) => image.storage_path),
+      { signedUrlTtlSec: 3600 }
+    );
 
-    const signedUrlByPath = new Map<string, string>();
-    if (normalizedPaths.length > 0) {
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from(bucket)
-        .createSignedUrls(normalizedPaths, 60 * 60);
-
-      if (signedError) {
-        return badRequest(signedError.message);
-      }
-
-      for (const row of signedData ?? []) {
-        if (row.path && row.signedUrl) {
-          signedUrlByPath.set(row.path, row.signedUrl);
-        }
-      }
-    }
-
-    const imagesWithSignedUrls = images.map((image) => {
-      const normalizedPath = normalizeStoragePathForBucket(image.storage_path, bucket);
-      return {
-        ...image,
-        signed_url: signedUrlByPath.get(normalizedPath) ?? null
-      };
-    });
+    const imagesWithSignedUrls = images.map((image) => ({
+      ...image,
+      signed_url: signedUrlByPath[image.storage_path] ?? null
+    }));
 
     return NextResponse.json({ images: imagesWithSignedUrls }, { status: 200 });
   } catch (error) {
@@ -122,6 +104,21 @@ export async function POST(
       }
     }
 
+    if (parsed.data.variant_id) {
+      const { data: variantRow, error: variantError } = await supabase
+        .from("product_variants")
+        .select("id")
+        .eq("id", parsed.data.variant_id)
+        .eq("product_id", id)
+        .maybeSingle();
+      if (variantError) {
+        return badRequest(variantError.message);
+      }
+      if (!variantRow) {
+        return badRequest("variant_id does not belong to this product");
+      }
+    }
+
     const { data, error } = await supabase
       .from("product_images")
       .insert({
@@ -129,7 +126,8 @@ export async function POST(
         storage_path: storagePath,
         alt_text: parsed.data.alt_text ?? null,
         sort_order: parsed.data.sort_order,
-        is_primary: parsed.data.is_primary
+        is_primary: parsed.data.is_primary,
+        variant_id: parsed.data.variant_id ?? null
       })
       .select("*")
       .single();

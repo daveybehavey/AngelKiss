@@ -1,7 +1,16 @@
 import { assertAdminFromRequest } from "@/lib/auth/admin";
-import { getProductImagesBucket, getStoragePathForProductImage } from "@/lib/admin/images";
+import {
+  getProductImagesBucket,
+  getStoragePathForProductImage,
+  normalizeStoragePathForBucket
+} from "@/lib/admin/images";
 import { getAdminProductRow } from "@/lib/admin/products";
 import { badRequest, notFound, serverError, unauthorized } from "@/lib/http/json";
+import {
+  catalogMediaUsesR2Uploads,
+  getCatalogMediaUploadBlockReason
+} from "@/lib/server/catalog-media-storage";
+import { createR2PresignedPutForCatalogObject } from "@/lib/server/r2-product-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -42,8 +51,31 @@ export async function POST(
       return notFound("Product not found");
     }
 
+    const uploadBlock = getCatalogMediaUploadBlockReason();
+    if (uploadBlock) {
+      return badRequest(uploadBlock);
+    }
+
     const bucket = getProductImagesBucket();
     const storagePath = getStoragePathForProductImage(id, parsed.data.filename);
+
+    if (catalogMediaUsesR2Uploads()) {
+      const objectKey = normalizeStoragePathForBucket(storagePath, bucket);
+      const uploadUrl = await createR2PresignedPutForCatalogObject({
+        objectKey,
+        contentType: parsed.data.content_type
+      });
+      return NextResponse.json(
+        {
+          uploadUrl,
+          storagePath,
+          bucket,
+          expiresAt: new Date(Date.now() + SIGNED_UPLOAD_TTL_MS).toISOString(),
+          provider: "r2" as const
+        },
+        { status: 200 }
+      );
+    }
 
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     if (bucketsError) {
@@ -73,8 +105,10 @@ export async function POST(
       {
         uploadUrl: data.signedUrl,
         storagePath,
+        bucket,
         expiresAt: new Date(Date.now() + SIGNED_UPLOAD_TTL_MS).toISOString(),
-        token: data.token
+        token: data.token,
+        provider: "supabase" as const
       },
       { status: 200 }
     );

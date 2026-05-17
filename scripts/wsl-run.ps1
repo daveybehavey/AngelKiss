@@ -1,6 +1,8 @@
 param(
   [Parameter(Mandatory = $true, Position = 0)]
-  [string]$Command
+  [string]$Command,
+  # Skip rsync when WSL copy already exists (fast repeat starts for `npm run dev`).
+  [switch]$Quick
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,8 +21,15 @@ set -o pipefail
 
 REMOTE_CMD="$(printf "%s" "REMOTE_B64_PLACEHOLDER" | base64 -d)"
 
-WIN_SRC="${WIN_SRC:-/mnt/c/Users/david/OneDrive/Desktop/AngelKiss}"
+WIN_SRC="${WIN_SRC:-/mnt/c/Users/david/Desktop/AngelKiss}"
 DST="${WSL_REPO:-$HOME/code/AngelKiss}"
+
+# QUICK_FLAG_PLACEHOLDER (replaced by PowerShell: 1 or 0)
+if [[ "QUICK_FLAG_PLACEHOLDER" == "1" ]] && [[ -d "$WIN_SRC" ]] && [[ -f "$DST/package.json" ]]; then
+  echo "wsl-run: quick mode (no sync) — using $DST"
+  cd "$DST" || exit 1
+  exec bash -lc "$REMOTE_CMD"
+fi
 
 if [[ ! -d "$WIN_SRC" ]]; then
   echo "wsl-run: expected Windows checkout at: $WIN_SRC" >&2
@@ -56,6 +65,8 @@ exec bash -lc "$REMOTE_CMD"
 '@
 
 $bootstrap = $bootstrap.Replace("REMOTE_B64_PLACEHOLDER", $remoteB64)
+$quickFlag = if ($Quick) { "1" } else { "0" }
+$bootstrap = $bootstrap.Replace("QUICK_FLAG_PLACEHOLDER", $quickFlag)
 $bootstrapB64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($bootstrap))
 
 # PowerShell writes CRLF; strip \r after decoding to keep bash happy.
