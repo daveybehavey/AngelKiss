@@ -1,6 +1,7 @@
 import { assertAdminFromRequest } from "@/lib/auth/admin";
 import { getAdminProductRow } from "@/lib/admin/products";
 import { badRequest, notFound, serverError, unauthorized } from "@/lib/http/json";
+import { ensureCatalogGridVariantInR2 } from "@/lib/server/catalog-grid-variant";
 import { resolveStorefrontProductImageReadUrls } from "@/lib/storefront/storefront-media-url";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
@@ -135,6 +136,10 @@ export async function POST(
     if (error || !data) {
       return badRequest(error?.message ?? "Failed to create product image");
     }
+
+    void ensureCatalogGridVariantInR2(storagePath).catch(() => {
+      /* grid variant is best-effort; storefront falls back to master URL */
+    });
 
     return NextResponse.json({ image: data }, { status: 201 });
   } catch (error) {

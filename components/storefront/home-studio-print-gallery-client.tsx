@@ -1,10 +1,14 @@
 "use client";
 
 import {
+  getStorefrontGridImageUrl,
+  STOREFRONT_HOME_STUDIO_IMAGE_WIDTH,
+  storefrontGridImageUnoptimized
+} from "@/lib/storefront/storefront-image-src";
+import {
   shopHrefForStudioPrint,
   STUDIO_PRINT_COMING_SOON_IMAGE,
-  studioPrintImageSrcForNextImage,
-  studioPrintImageUnoptimized
+  studioPrintImageSrcForNextImage
 } from "@/lib/storefront/studio-print-client";
 import type { PublicStudioPrint } from "@/lib/storefront/studio-prints";
 import Image from "next/image";
@@ -103,7 +107,8 @@ export function HomeStudioPrintGalleryClient({ prints }: HomeStudioPrintGalleryC
           Studio prints you can wear and gift
         </h2>
         <p className="home-studio-print-lead">
-          Choose one of these looks on mugs, tumblers, bags, and more—then we sublimate it with care.
+          These are our own in-house designs—choose one for mugs, tumblers, bags, and more, and we
+          print it with care.
         </p>
         <p className="home-studio-print-actions">
           <Link href="/gallery" className="btn btn-outline btn-sm">
@@ -117,7 +122,10 @@ export function HomeStudioPrintGalleryClient({ prints }: HomeStudioPrintGalleryC
           const on = index === activeIndex;
           const alt = print.alt_text?.trim() || print.title;
           const frameStyle = studioPrintImageFrameStyle(print);
-          const imageSrc = studioPrintImageSrcForNextImage(print.image_url);
+          const imageSrc =
+            getStorefrontGridImageUrl(print.image_url, {
+              width: STOREFRONT_HOME_STUDIO_IMAGE_WIDTH
+            }) ?? studioPrintImageSrcForNextImage(print.image_url);
           return (
             <div
               key={print.id}
@@ -144,7 +152,7 @@ export function HomeStudioPrintGalleryClient({ prints }: HomeStudioPrintGalleryC
                     sizes="(max-width: 980px) 92vw, min(560px, 46vw)"
                     quality={72}
                     priority={activeIndex === 0}
-                    unoptimized={studioPrintImageUnoptimized(imageSrc)}
+                    unoptimized={storefrontGridImageUnoptimized(imageSrc)}
                   />
                 ) : null}
               </div>

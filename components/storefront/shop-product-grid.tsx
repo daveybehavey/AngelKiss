@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -11,8 +9,8 @@ import {
   storefrontStockToneClass
 } from "@/lib/storefront/product-display";
 import {
-  storefrontImageSrcOrNull,
-  storefrontImageUnoptimized
+  getStorefrontGridImageUrl,
+  storefrontGridImageUnoptimized
 } from "@/lib/storefront/storefront-image-src";
 import type { PublicProductSummary } from "@/lib/storefront/products";
 
@@ -29,7 +27,7 @@ export function ShopProductGrid({ items }: Props) {
     <ul className="product-grid product-grid-entrance">
       {items.map((item, index) => {
         const displayName = formatShopperProductTitle(item.name);
-        const primarySrc = storefrontImageSrcOrNull(item.primary_image_url);
+        const primarySrc = getStorefrontGridImageUrl(item.primary_image_url);
         return (
           <li key={item.id} className="product-card product-card-shine">
             <Link href={`/shop/${item.slug}`} className="product-card-link" prefetch={false}>
@@ -39,10 +37,13 @@ export function ShopProductGrid({ items }: Props) {
                     src={primarySrc}
                     alt={item.primary_image_alt ?? displayName}
                     fill
-                    sizes="(max-width: 700px) 100vw, (max-width: 980px) 50vw, 320px"
+                    sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 256px"
+                    quality={72}
                     className="product-card-photo"
-                    loading={index < 6 ? "eager" : "lazy"}
-                    unoptimized={storefrontImageUnoptimized(primarySrc)}
+                    loading={index < 2 ? "eager" : "lazy"}
+                    priority={index === 0}
+                    fetchPriority={index < 2 ? (index === 0 ? "high" : "low") : "low"}
+                    unoptimized={storefrontGridImageUnoptimized(primarySrc)}
                   />
                 ) : (
                   <div className="product-image-placeholder">Photo coming soon</div>

@@ -28,11 +28,26 @@ applyProductionBuildEnv(root);
 const canonical =
   process.env.CANONICAL_SITE_URL?.trim() || "https://anglkisscreations.ca";
 process.env.NEXT_PUBLIC_SITE_URL = canonical;
+if (!process.env.NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE?.trim()) {
+  process.env.NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE = "1";
+}
+if (
+  process.env.NEXT_PUBLIC_IMAGE_CDN_BASE_URL?.trim() &&
+  !process.env.NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS?.trim()
+) {
+  process.env.NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS = "1";
+}
 
 console.log(`deploy-canonical: NEXT_PUBLIC_SITE_URL=${canonical}`);
+console.log(
+  `deploy-canonical: NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE=${process.env.NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE}`
+);
 if (process.env.NEXT_PUBLIC_IMAGE_CDN_BASE_URL?.trim()) {
   console.log(
     `deploy-canonical: NEXT_PUBLIC_IMAGE_CDN_BASE_URL=${process.env.NEXT_PUBLIC_IMAGE_CDN_BASE_URL}`
+  );
+  console.log(
+    `deploy-canonical: NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS=${process.env.NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS ?? "(unset)"}`
   );
 }
 

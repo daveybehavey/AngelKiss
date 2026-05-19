@@ -30,6 +30,14 @@ type AdminView = "home" | "add" | "manage" | "shipping";
 type ManageMode = "quick" | "advanced";
 type ShippingZone = "local" | "regional" | "national" | "usa";
 
+type ProductImageSummary = {
+  uploaded_image_count: number;
+  display_image_count: number;
+  primary_preview_url: string | null;
+  primary_preview_alt: string | null;
+  uses_local_catalog_fallback: boolean;
+};
+
 type ProductSummary = {
   id: string;
   slug: string;
@@ -49,6 +57,7 @@ type ProductSummary = {
   custom_sublimation_details: {
     allow_image_upload: boolean;
   } | null;
+  image_summary: ProductImageSummary;
   created_at: string;
   updated_at: string;
 };
@@ -413,19 +422,6 @@ export default function AdminPage() {
       setStockDraftByProduct(
         Object.fromEntries(items.map((item) => [item.id, item.inventory_mode === "finite" ? String(item.stock_quantity ?? 0) : ""]))
       );
-
-      const imageEntries = await Promise.all(
-        items.map(async (item) => {
-          try {
-            const images = await loadImagesForProduct(item.id);
-            return [item.id, images] as const;
-          } catch {
-            return [item.id, []] as const;
-          }
-        })
-      );
-
-      setImagesByProduct(Object.fromEntries(imageEntries));
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load products");
     } finally {
@@ -488,6 +484,41 @@ export default function AdminPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    if (!token || adminView !== "manage" || manageMode !== "advanced" || products.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const imageEntries = await Promise.all(
+        products.map(async (item) => {
+          if (imagesByProduct[item.id]) {
+            return [item.id, imagesByProduct[item.id]!] as const;
+          }
+          try {
+            const images = await loadImagesForProduct(item.id);
+            return [item.id, images] as const;
+          } catch {
+            return [item.id, []] as const;
+          }
+        })
+      );
+
+      if (!cancelled) {
+        setImagesByProduct((current) => ({
+          ...current,
+          ...Object.fromEntries(imageEntries)
+        }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, adminView, manageMode, products]);
 
   useEffect(() => {
     if (!error) {
@@ -1195,6 +1226,7 @@ export default function AdminPage() {
       setUploadPrimaryFlag(product.id, false);
       setMessage(files.length > 1 ? `${files.length} photos uploaded.` : "Image uploaded.");
       await refreshImagesForProduct(product.id);
+      await loadProducts();
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Failed to upload image");
     } finally {
@@ -1217,6 +1249,7 @@ export default function AdminPage() {
 
       setMessage("Primary image updated.");
       await refreshImagesForProduct(productId);
+      await loadProducts();
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Failed to update image");
     } finally {
@@ -1242,6 +1275,7 @@ export default function AdminPage() {
       });
       setMessage("Image deleted.");
       await refreshImagesForProduct(productId);
+      await loadProducts();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete image");
     } finally {
@@ -1257,11 +1291,10 @@ export default function AdminPage() {
     let needsAttention = 0;
 
     for (const product of products) {
-      const imageCount = imagesByProduct[product.id]?.length ?? 0;
       const isLowStock = product.inventory_mode === "finite" && product.is_low_stock;
       const isSoldOut = product.inventory_mode === "finite" && product.is_sold_out;
       const isHidden = product.status !== "published" || !product.is_available;
-      const isNoImages = imageCount === 0;
+      const isNoImages = product.image_summary.display_image_count === 0;
       const isNeedsAttention = isLowStock || isSoldOut || isNoImages;
 
       if (isLowStock) {
@@ -1289,16 +1322,15 @@ export default function AdminPage() {
       hidden,
       needsAttention
     };
-  }, [imagesByProduct, products]);
+  }, [products]);
 
   const visibleProducts = useMemo(() => {
     const query = productSearch.trim().toLowerCase();
 
     return products.filter((product) => {
-      const imageCount = imagesByProduct[product.id]?.length ?? 0;
       const isLowStock = product.inventory_mode === "finite" && product.is_low_stock;
       const isSoldOut = product.inventory_mode === "finite" && product.is_sold_out;
-      const isNoImages = imageCount === 0;
+      const isNoImages = product.image_summary.display_image_count === 0;
       const isHidden = product.status !== "published" || !product.is_available;
       const isNeedsAttention = isLowStock || isSoldOut || isNoImages;
 
@@ -1331,7 +1363,7 @@ export default function AdminPage() {
         product.slug.toLowerCase().includes(query)
       );
     });
-  }, [imagesByProduct, productSearch, productViewFilter, products]);
+  }, [productSearch, productViewFilter, products]);
 
   async function runBulkAction(
     actionLabel: string,
@@ -2260,12 +2292,14 @@ export default function AdminPage() {
             <ul className="admin-card-list">
               {visibleProducts.map((product) => {
                 const productImages = imagesByProduct[product.id] ?? [];
-                const imageCount = productImages.length;
-                const primaryImage =
-                  productImages.find((image) => image.is_primary) ?? productImages[0] ?? null;
+                const uploadedImageCount = product.image_summary.uploaded_image_count;
+                const displayImageCount = product.image_summary.display_image_count;
+                const previewUrl = product.image_summary.primary_preview_url;
+                const previewAlt = product.image_summary.primary_preview_alt;
+                const usesCatalogFallback = product.image_summary.uses_local_catalog_fallback;
                 const isLowStock = product.inventory_mode === "finite" && product.is_low_stock;
                 const isSoldOut = product.inventory_mode === "finite" && product.is_sold_out;
-                const isNoImages = imageCount === 0;
+                const isNoImages = displayImageCount === 0;
                 const isHidden = product.status !== "published" || !product.is_available;
 
                 const publishTone =
@@ -2292,11 +2326,8 @@ export default function AdminPage() {
                   <li key={product.id} className="itemCard">
                     <div className="admin-product-preview-row">
                       <div className="admin-product-preview-frame" aria-hidden="true">
-                        {primaryImage?.signed_url ? (
-                          <img
-                            src={primaryImage.signed_url}
-                            alt={primaryImage.alt_text ?? `${product.name} photo`}
-                          />
+                        {previewUrl ? (
+                          <img src={previewUrl} alt={previewAlt ?? `${product.name} photo`} />
                         ) : (
                           <div className="admin-product-preview-empty">No photo</div>
                         )}
@@ -2315,7 +2346,11 @@ export default function AdminPage() {
                         </p>
                         <p className="admin-order-meta">
                           ${(product.base_price_cents / 100).toFixed(2)} {product.currency} • {stockSummary} • Photos{" "}
-                          {imageCount}
+                          {displayImageCount}
+                          {usesCatalogFallback ? " (shop placeholder)" : ""}
+                          {uploadedImageCount > 0 && uploadedImageCount !== displayImageCount
+                            ? ` • ${uploadedImageCount} uploaded`
+                            : ""}
                         </p>
                         {product.inventory_mode === "made_to_order" ? (
                           <p className="admin-note-tight">
@@ -2648,7 +2683,13 @@ export default function AdminPage() {
                               </li>
                             ))}
                           </ul>
-                          {imageCount === 0 ? <p className="admin-note-spaced">No images yet.</p> : null}
+                          {uploadedImageCount === 0 ? (
+                            <p className="admin-note-spaced">
+                              {usesCatalogFallback
+                                ? "Shop shows a marketing placeholder — upload photos here to replace it."
+                                : "No images yet."}
+                            </p>
+                          ) : null}
                         </div>
 
                           <div className="admin-divider-block">

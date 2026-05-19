@@ -235,67 +235,149 @@ export default function CheckoutPage() {
     activeCheckoutSessionRef.current = null;
   }, []);
 
+  const onPaymentStep = Boolean(result);
+  const checkoutComplete = Boolean(paymentResult);
+  const cartIsEmpty = items.length === 0;
+
   return (
     <main className="page-main checkout-page">
-      <section className="panel page-intro">
+      <section className="panel page-intro checkout-intro">
         <h1 className="page-title">Checkout</h1>
         <p className="page-lead">
-          Add your shipping details, review your order, then pay securely with PayPal.
+          Review your order, enter a Canadian shipping address, then pay securely with PayPal.
         </p>
+        <ul className="checkout-trust-strip" aria-label="Checkout assurances">
+          <li>Secure PayPal checkout</li>
+          <li>Ships within Canada</li>
+          <li>Handmade &amp; custom orders welcome</li>
+        </ul>
+        {!cartIsEmpty ? (
+          <ol className="checkout-steps" aria-label="Checkout progress">
+            <li className="checkout-step checkout-step--done">
+              <span className="checkout-step-marker" aria-hidden="true">
+                1
+              </span>
+              <span className="checkout-step-label">Order</span>
+            </li>
+            <li
+              className={
+                onPaymentStep
+                  ? "checkout-step checkout-step--done"
+                  : "checkout-step checkout-step--current"
+              }
+            >
+              <span className="checkout-step-marker" aria-hidden="true">
+                2
+              </span>
+              <span className="checkout-step-label">Shipping</span>
+            </li>
+            <li
+              className={
+                checkoutComplete
+                  ? "checkout-step checkout-step--done"
+                  : onPaymentStep
+                    ? "checkout-step checkout-step--current"
+                    : "checkout-step"
+              }
+            >
+              <span className="checkout-step-marker" aria-hidden="true">
+                3
+              </span>
+              <span className="checkout-step-label">Payment</span>
+            </li>
+          </ol>
+        ) : null}
         <p className="page-link-row">
           <Link href="/shop">Shop</Link>
           <Link href="/cart">Cart</Link>
         </p>
       </section>
 
-      <section className="panel checkout-summary">
-        <h2>Your Order at a Glance</h2>
-        <p className="checkout-helper-note">Shipping to: {shippingAddressSummary}</p>
-        <p className="summary-line">
-          <span>Items</span>
-          <strong>{itemCount}</strong>
-        </p>
-        {customPrintItemCount > 0 ? (
-          <p className="summary-line">
-            <span>Custom print items</span>
-            <strong>{customPrintItemCount}</strong>
+      {cartIsEmpty ? (
+        <section className="panel checkout-empty" aria-labelledby="checkout-empty-heading">
+          <h2 id="checkout-empty-heading" className="checkout-section-title">
+            Your cart is empty
+          </h2>
+          <p className="checkout-helper-note">
+            Add something from the shop first—we&apos;ll bring you back here when you&apos;re ready
+            to pay.
           </p>
-        ) : null}
-        <p className="summary-line">
-          <span>Cart subtotal</span>
-          <strong>{formatMoney(subtotalCents, currency)}</strong>
-        </p>
-        <ul className="checkout-item-list" aria-label="Items in checkout">
-          {items.map((item) => (
-            <li key={item.cart_item_id} className="checkout-item-row">
-              <span>
-                {formatShopperProductTitle(item.name)} x {item.quantity}
-              </span>
-              <strong>{formatMoney(lineTotalCents(item), item.currency)}</strong>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <p className="checkout-empty-actions">
+            <Link href="/shop" className="btn btn-primary">
+              Browse products
+            </Link>
+            <Link href="/cart">View cart</Link>
+          </p>
+        </section>
+      ) : (
+        <div className="checkout-layout">
+          <aside className="checkout-aside" aria-label="Order summary">
+            <section className="panel checkout-summary">
+              <h2 className="checkout-section-title">Order summary</h2>
+              <p className="checkout-helper-note">Shipping to: {shippingAddressSummary}</p>
+              <div className="checkout-totals-card">
+                <p className="summary-line">
+                  <span>Items</span>
+                  <strong>{itemCount}</strong>
+                </p>
+                {customPrintItemCount > 0 ? (
+                  <p className="summary-line">
+                    <span>Custom print items</span>
+                    <strong>{customPrintItemCount}</strong>
+                  </p>
+                ) : null}
+                <p className="summary-line checkout-summary-total">
+                  <span>Cart subtotal</span>
+                  <strong>{formatMoney(subtotalCents, currency)}</strong>
+                </p>
+              </div>
+              <p className="checkout-helper-note checkout-summary-note">
+                Shipping and any promo discount are calculated when you continue to payment.
+              </p>
+              <ul className="checkout-item-list" aria-label="Items in checkout">
+                {items.map((item) => (
+                  <li key={item.cart_item_id} className="checkout-item-row">
+                    <span>
+                      {formatShopperProductTitle(item.name)} × {item.quantity}
+                    </span>
+                    <strong>{formatMoney(lineTotalCents(item), item.currency)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </aside>
 
-      <section className="panel checkout-form-panel">
-        <h2>Contact + Shipping</h2>
-        <form onSubmit={handleCreateCheckoutSession} className="checkout-form-grid">
-          <label className="form-field">
-            Email
-            <input
-              className="field-control"
-              type="email"
-              required
-              autoComplete="email"
-              enterKeyHint="next"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              disabled={busy}
-            />
-          </label>
+          <div className="checkout-main">
+            {!result && !paymentResult ? (
+              <section className="panel checkout-form-panel" aria-labelledby="checkout-shipping-heading">
+                <h2 id="checkout-shipping-heading" className="checkout-section-title">
+                  Contact &amp; shipping
+                </h2>
+                <p className="checkout-helper-note">
+                  We ship to Canadian addresses only. Fields marked below are required.
+                </p>
+                <form onSubmit={handleCreateCheckoutSession} className="checkout-form-grid" noValidate>
+                  <fieldset className="checkout-fieldset">
+                    <legend>Contact</legend>
+                    <label className="form-field">
+                      Email
+                      <input
+                        className="field-control"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        enterKeyHint="next"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        disabled={busy}
+                      />
+                    </label>
+                  </fieldset>
 
-          <label className="form-field">
-            Full name
+                  <fieldset className="checkout-fieldset">
+                    <legend>Delivery address</legend>
+                    <label className="form-field">
+                      Full name
             <input
               className="field-control"
               required
@@ -345,11 +427,12 @@ export default function CheckoutPage() {
               }
               disabled={busy}
             />
-          </label>
+                    </label>
 
-          <label className="form-field">
-            Country
-            <select
+                    <div className="checkout-form-row">
+                      <label className="form-field">
+                        Country
+                        <select
               className="field-control"
               required
               autoComplete="country-name"
@@ -369,12 +452,12 @@ export default function CheckoutPage() {
                   {option.label}
                 </option>
               ))}
-            </select>
-          </label>
+                        </select>
+                      </label>
 
-          <label className="form-field">
-            Province / State
-            <select
+                      <label className="form-field">
+                        Province / Territory
+                        <select
               className="field-control"
               required
               autoComplete="address-level1"
@@ -392,157 +475,177 @@ export default function CheckoutPage() {
                   {region.label} ({region.code})
                 </option>
               ))}
-            </select>
-          </label>
+                        </select>
+                      </label>
+                    </div>
 
-          <label className="form-field">
-            City
-            <input
-              className="field-control"
-              required
-              autoComplete="address-level2"
-              enterKeyHint="next"
-              value={shippingAddress.city}
-              onChange={(event) =>
-                setShippingAddress((current) => ({
-                  ...current,
-                  city: event.target.value
-                }))
-              }
-              disabled={busy}
-            />
-          </label>
+                    <div className="checkout-form-row">
+                      <label className="form-field">
+                        City
+                        <input
+                          className="field-control"
+                          required
+                          autoComplete="address-level2"
+                          enterKeyHint="next"
+                          value={shippingAddress.city}
+                          onChange={(event) =>
+                            setShippingAddress((current) => ({
+                              ...current,
+                              city: event.target.value
+                            }))
+                          }
+                          disabled={busy}
+                        />
+                      </label>
 
-          <label className="form-field">
-            Postal/ZIP code
-            <input
-              className="field-control"
-              required
-              autoComplete="postal-code"
-              enterKeyHint="next"
-              value={shippingAddress.postal_code}
-              onChange={(event) =>
-                setShippingAddress((current) => ({
-                  ...current,
-                  postal_code: normalizePostalCodeInput(
-                    "CA",
-                    event.target.value
-                  )
-                }))
-              }
-              onBlur={(event) =>
-                setShippingAddress((current) => ({
-                  ...current,
-                  postal_code: normalizePostalCodeInput(
-                    "CA",
-                    event.target.value
-                  )
-                }))
-              }
-              disabled={busy}
-            />
-            <span className="form-hint">
-              Canadian format: A1A 1A1
-            </span>
-          </label>
+                      <label className="form-field">
+                        Postal code
+                        <input
+                          className="field-control"
+                          required
+                          autoComplete="postal-code"
+                          enterKeyHint="next"
+                          value={shippingAddress.postal_code}
+                          onChange={(event) =>
+                            setShippingAddress((current) => ({
+                              ...current,
+                              postal_code: normalizePostalCodeInput("CA", event.target.value)
+                            }))
+                          }
+                          onBlur={(event) =>
+                            setShippingAddress((current) => ({
+                              ...current,
+                              postal_code: normalizePostalCodeInput("CA", event.target.value)
+                            }))
+                          }
+                          disabled={busy}
+                        />
+                        <span className="form-hint">Canadian format: A1A 1A1</span>
+                      </label>
+                    </div>
 
-          <label className="form-field">
-            Phone (optional)
-            <input
-              className="field-control"
-              autoComplete="tel"
-              inputMode="tel"
-              enterKeyHint="done"
-              value={shippingAddress.phone}
-              onChange={(event) =>
-                setShippingAddress((current) => ({
-                  ...current,
-                  phone: event.target.value
-                }))
-              }
-              disabled={busy}
-            />
-          </label>
+                    <label className="form-field">
+                      Phone (optional)
+                      <input
+                        className="field-control"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        enterKeyHint="done"
+                        value={shippingAddress.phone}
+                        onChange={(event) =>
+                          setShippingAddress((current) => ({
+                            ...current,
+                            phone: event.target.value
+                          }))
+                        }
+                        disabled={busy}
+                      />
+                    </label>
+                  </fieldset>
 
-          <label className="form-field">
-            Promo code (optional)
-            <input
-              className="field-control"
-              autoComplete="off"
-              autoCapitalize="characters"
-              spellCheck={false}
-              enterKeyHint="done"
-              value={promoCode}
-              onChange={(event) => setPromoCode(event.target.value)}
-              onBlur={() => setPromoCode((current) => normalizePromoCodeInput(current))}
-              disabled={busy}
-              placeholder="e.g. ANGELTEST"
-            />
-          </label>
+                  <fieldset className="checkout-fieldset checkout-fieldset--promo">
+                    <legend>Promo code</legend>
+                    <label className="form-field">
+                      <span className="sr-only">Promo code (optional)</span>
+                      <input
+                        className="field-control"
+                        autoComplete="off"
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        enterKeyHint="done"
+                        value={promoCode}
+                        onChange={(event) => setPromoCode(event.target.value)}
+                        onBlur={() => setPromoCode((current) => normalizePromoCodeInput(current))}
+                        disabled={busy}
+                        placeholder="e.g. ANGELTEST"
+                      />
+                    </label>
+                  </fieldset>
 
-          <button type="submit" className="btn btn-primary checkout-submit" disabled={!canSubmit || busy}>
-            {busy ? "Preparing checkout..." : "Continue to payment"}
-          </button>
-        </form>
-          <p className="checkout-helper-note">
-            By continuing, you accept our{" "}
-            <Link href="/shipping">Shipping Policy</Link>,{" "}
-            <Link href="/returns">Returns &amp; Refunds</Link>, and{" "}
-            <Link href="/privacy">Privacy Policy</Link>.
-          </p>
-      </section>
+                  <div className="checkout-form-actions">
+                    <button
+                      type="submit"
+                      className="btn btn-primary checkout-submit"
+                      disabled={!canSubmit || busy}
+                      aria-busy={busy ? true : undefined}
+                    >
+                      {busy ? "Preparing checkout..." : "Continue to payment"}
+                    </button>
+                    <p className="checkout-helper-note checkout-policy-note">
+                      By continuing, you accept our{" "}
+                      <Link href="/shipping">Shipping Policy</Link>,{" "}
+                      <Link href="/returns">Returns &amp; Refunds</Link>, and{" "}
+                      <Link href="/privacy">Privacy Policy</Link>.
+                    </p>
+                  </div>
+                </form>
+              </section>
+            ) : null}
 
-      {error ? <p className="checkout-error">{error}</p> : null}
+            {error ? (
+              <p className="checkout-error" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-      {result ? (
-        <section className="panel checkout-result-panel">
-          <h2>Almost Done: Secure Payment</h2>
-          <p className="checkout-helper-note">
-            Complete payment below. Do not close this page until confirmation appears.
-          </p>
-          <p className="checkout-session-id">Checkout ref: {result.checkoutSessionId}</p>
-          <p className="summary-line">
-            <span>Status</span>
-            <strong>{result.status}</strong>
-          </p>
-          <p className="summary-line">
-            <span>Subtotal</span>
-            <strong>{formatMoney(result.totals.subtotal_cents, currency)}</strong>
-          </p>
-          <p className="summary-line">
-            <span>Shipping</span>
-            <strong>{formatMoney(result.totals.shipping_cents, currency)}</strong>
-          </p>
-          {(result.totals.discount_cents ?? 0) > 0 ? (
-            <p className="summary-line">
-              <span>
-                Discount
-                {result.totals.promo_code ? ` (${result.totals.promo_code})` : ""}
-              </span>
-              <strong>-{formatMoney(result.totals.discount_cents ?? 0, currency)}</strong>
-            </p>
-          ) : null}
-          <p className="summary-line">
-            <span>Total</span>
-            <strong>{formatMoney(result.totals.total_cents, currency)}</strong>
-          </p>
-          <p className="summary-line">
-            <span>Shipping zone</span>
-            <strong>{result.totals.shipping_zone}</strong>
-          </p>
-          {result.totals.free_shipping_applied ? (
-            <p className="checkout-free-shipping">Great news: free shipping was applied.</p>
-          ) : null}
+            {result ? (
+              <section
+                className="panel checkout-result-panel"
+                aria-labelledby="checkout-payment-heading"
+              >
+                <h2 id="checkout-payment-heading" className="checkout-section-title">
+                  Secure payment
+                </h2>
+                <p className="checkout-helper-note">
+                  Complete payment with PayPal below. Keep this page open until you see confirmation.
+                </p>
+                <p className="checkout-trust-inline">
+                  PayPal protects your payment details—we never store your card number.
+                </p>
+                <details className="checkout-session-meta">
+                  <summary>Checkout reference</summary>
+                  <p className="checkout-session-id">{result.checkoutSessionId}</p>
+                </details>
+                <div className="checkout-totals-card checkout-totals-card--final">
+                  <p className="summary-line">
+                    <span>Subtotal</span>
+                    <strong>{formatMoney(result.totals.subtotal_cents, currency)}</strong>
+                  </p>
+                  <p className="summary-line">
+                    <span>Shipping</span>
+                    <strong>{formatMoney(result.totals.shipping_cents, currency)}</strong>
+                  </p>
+                  {(result.totals.discount_cents ?? 0) > 0 ? (
+                    <p className="summary-line">
+                      <span>
+                        Discount
+                        {result.totals.promo_code ? ` (${result.totals.promo_code})` : ""}
+                      </span>
+                      <strong>-{formatMoney(result.totals.discount_cents ?? 0, currency)}</strong>
+                    </p>
+                  ) : null}
+                  <p className="summary-line checkout-summary-total">
+                    <span>Total due</span>
+                    <strong>{formatMoney(result.totals.total_cents, currency)}</strong>
+                  </p>
+                  <p className="summary-line checkout-summary-meta">
+                    <span>Shipping zone</span>
+                    <strong>{result.totals.shipping_zone}</strong>
+                  </p>
+                </div>
+                {result.totals.free_shipping_applied ? (
+                  <p className="checkout-free-shipping">Free shipping applied to this order.</p>
+                ) : null}
 
-          {!paymentResult ? (
-            <PayPalButton
-              checkoutSessionId={result.checkoutSessionId}
-              onSuccess={handlePaymentSuccess}
-              onCancel={handlePaymentCancel}
-            />
-          ) : null}
+                {!paymentResult ? (
+                  <PayPalButton
+                    checkoutSessionId={result.checkoutSessionId}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={handlePaymentCancel}
+                  />
+                ) : null}
 
-          {paymentResult ? (
+                {paymentResult ? (
             <section className="checkout-payment-success" aria-live="polite">
               <p className="checkout-success-eyebrow">Thank you</p>
               <h3 className="checkout-success-title">
@@ -602,10 +705,13 @@ export default function CheckoutPage() {
                   <p>Order reference: {paymentResult.orderId}</p>
                 ) : null}
               </details>
-            </section>
-          ) : null}
-        </section>
-      ) : null}
+                </section>
+              ) : null}
+              </section>
+            ) : null}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

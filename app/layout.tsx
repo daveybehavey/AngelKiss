@@ -5,8 +5,8 @@ import Link from "next/link";
 import { CloudflareWebAnalytics } from "@/components/analytics/cloudflare-web-analytics";
 import { normalizeStorefrontImageCdnBaseUrl } from "@/lib/storefront/image-cdn-env";
 import { SiteBrandLink } from "@/components/storefront/site-brand-link";
+import { HeaderNav } from "@/components/storefront/header-nav";
 import { CartProvider } from "@/components/storefront/cart-provider";
-import { CartNavLink } from "@/components/storefront/cart-nav-link";
 import { NewsletterSignup } from "@/components/storefront/newsletter-signup";
 import "./globals.css";
 
@@ -43,7 +43,14 @@ const metadataBase = (() => {
 })();
 
 const siteDescription =
-  "Handmade crochet gifts, in-house studio prints, ready-made designs, and made-to-order custom photo sublimation.";
+  "Handmade crochet gifts and custom prints from Vancouver Island—your photo or our in-house designs on mugs, tumblers, bags, and more.";
+
+const siteOgImage = {
+  url: "/marketing/home-gallery/stand-04.webp",
+  width: 1200,
+  height: 630,
+  alt: "AnglKiss Creations market booth — handmade crochet and custom prints"
+} as const;
 
 const FACEBOOK_PAGE_URL = "https://www.facebook.com/share/g/1HKrrGAS6B/";
 
@@ -63,12 +70,14 @@ export const metadata: Metadata = {
     url: metadataBase,
     siteName: "AnglKiss Creations",
     title: "AnglKiss Creations",
-    description: siteDescription
+    description: siteDescription,
+    images: [siteOgImage]
   },
   twitter: {
     card: "summary_large_image",
     title: "AnglKiss Creations",
-    description: siteDescription
+    description: siteDescription,
+    images: [siteOgImage.url]
   },
   robots: {
     index: true,
@@ -145,12 +154,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <header className="site-header">
               <div className="site-wrap site-header-inner">
                 <SiteBrandLink />
-                <nav className="site-nav" aria-label="Main navigation">
-                  <Link href="/shop">Shop</Link>
-                  <Link href="/gallery">Gallery</Link>
-                  <CartNavLink />
-                  <Link href="/checkout">Checkout</Link>
-                </nav>
+                <HeaderNav />
               </div>
             </header>
             <div id="main-content" tabIndex={-1}>
@@ -169,13 +173,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   <h2 className="site-footer-title">Shop</h2>
                   <ul className="site-footer-links">
                     <li>
-                      <Link href="/shop">All Products</Link>
+                      <Link href="/shop">All products</Link>
                     </li>
                     <li>
-                      <Link href="/shop?category=custom_sublimation">Custom-Printed</Link>
+                      <Link href="/shop?category=handmade_crochet_knit">Crochet &amp; knit</Link>
                     </li>
                     <li>
-                      <Link href="/shop?category=handmade_crochet_knit">Crochet & Knit</Link>
+                      <Link href="/shop?category=custom_sublimation">Custom prints</Link>
+                    </li>
+                    <li>
+                      <Link href="/gallery">Our print designs</Link>
+                    </li>
+                    <li>
+                      <Link href="/about">About</Link>
                     </li>
                   </ul>
                 </section>

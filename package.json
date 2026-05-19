@@ -38,6 +38,8 @@
     "optimize:favicon": "node scripts/optimize-favicon.mjs",
     "optimize:home-gallery": "node scripts/optimize-home-gallery.mjs",
     "qa:mobile": "node scripts/mobile-qa.mjs",
+    "audit:storefront": "node scripts/audit-storefront.mjs",
+    "qa:live": "node scripts/live-pass-production.mjs",
     "lighthouse": "node scripts/lighthouse.mjs",
     "lighthouse:psi": "node scripts/pagespeed-insights.mjs",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",

@@ -1,4 +1,10 @@
+import {
+  resolveAdminProductImageSummaries,
+  type AdminProductImageSummary
+} from "@/lib/admin/product-image-summary";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type { AdminProductImageSummary };
 
 export type ProductCategory = "custom_sublimation" | "handmade_crochet_knit";
 export type ProductStatus = "draft" | "published" | "unpublished";
@@ -75,6 +81,7 @@ export type AdminProductSummary = {
   is_available: boolean;
   status: ProductStatus;
   custom_sublimation_details: CustomSublimationSummaryDetails | null;
+  image_summary: AdminProductImageSummary;
   created_at: string;
   updated_at: string;
 };
@@ -122,7 +129,8 @@ export function computeInventory(product: Pick<ProductRow, "inventory_mode" | "s
 
 function mapSummary(
   product: ProductRow,
-  customSublimationDetails: CustomSublimationSummaryDetails | null
+  customSublimationDetails: CustomSublimationSummaryDetails | null,
+  imageSummary: AdminProductImageSummary
 ): AdminProductSummary {
   const inventory = computeInventory(product);
   return {
@@ -143,6 +151,7 @@ function mapSummary(
     status: product.status,
     custom_sublimation_details:
       product.category === "custom_sublimation" ? customSublimationDetails : null,
+    image_summary: imageSummary,
     created_at: product.created_at,
     updated_at: product.updated_at
   };
@@ -236,8 +245,32 @@ export async function listAdminProducts(
     }
   }
 
+  const imageSummaries = await resolveAdminProductImageSummaries(
+    supabase,
+    rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      category: row.category
+    }))
+  );
+
+  const emptyImageSummary: AdminProductImageSummary = {
+    uploaded_image_count: 0,
+    display_image_count: 0,
+    primary_preview_url: null,
+    primary_preview_alt: null,
+    uses_local_catalog_fallback: false
+  };
+
   const filtered = applyInventoryFilter(
-    rows.map((row) => mapSummary(row, customDetailsByProductId.get(row.id) ?? null)),
+    rows.map((row) =>
+      mapSummary(
+        row,
+        customDetailsByProductId.get(row.id) ?? null,
+        imageSummaries[row.id] ?? emptyImageSummary
+      )
+    ),
     inventoryFilter
   );
   const items = filtered.slice(0, options.limit);

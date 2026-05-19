@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
+  getStorefrontGridImageUrl,
+  storefrontGridImageUnoptimized,
   storefrontImageSrcOrNull,
   storefrontImageUnoptimized
 } from "@/lib/storefront/storefront-image-src";
@@ -80,6 +82,7 @@ export function ProductGallery({ productName, images }: ProductGalleryProps) {
         <ul className="product-thumb-grid" aria-label="Product image previews">
           {galleryImages.map((image, index) => {
             const isActive = index === selectedIndex;
+            const thumbSrc = getStorefrontGridImageUrl(image.url, { width: 160 }) ?? image.url;
             return (
               <li key={image.id}>
                 <button
@@ -90,13 +93,15 @@ export function ProductGallery({ productName, images }: ProductGalleryProps) {
                   aria-pressed={isActive}
                 >
                   <Image
-                    src={image.url}
+                    src={thumbSrc}
                     alt={image.alt}
                     width={160}
                     height={90}
                     sizes="90px"
+                    loading="lazy"
+                    decoding="async"
                     className="product-thumb-image"
-                    unoptimized={storefrontImageUnoptimized(image.url)}
+                    unoptimized={storefrontGridImageUnoptimized(thumbSrc)}
                   />
                 </button>
               </li>

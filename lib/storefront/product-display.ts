@@ -17,9 +17,9 @@ export function formatStorefrontMoney(cents: number, currency: string): string {
 
 export function formatStorefrontCategory(category: ProductCategory): string {
   if (category === "custom_sublimation") {
-    return "Custom Sublimation";
+    return "Custom prints";
   }
-  return "Handmade Crochet/Knit";
+  return "Crochet & knit";
 }
 
 export function formatStorefrontSublimationMode(mode: SublimationMode): string {

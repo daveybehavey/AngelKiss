@@ -1,10 +1,15 @@
 "use client";
 
+import { CartIcon } from "@/components/storefront/cart-icon";
 import { useCart } from "@/components/storefront/cart-provider";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-export function CartNavLink() {
+type CartNavLinkProps = {
+  className?: string;
+};
+
+export function CartNavLink({ className }: CartNavLinkProps) {
   const { itemCount, lastAddedAt } = useCart();
   const itemLabel = itemCount === 1 ? "item" : "items";
   const [animateBadge, setAnimateBadge] = useState(false);
@@ -22,13 +27,15 @@ export function CartNavLink() {
     return () => window.clearTimeout(timeoutId);
   }, [lastAddedAt]);
 
+  const classes = ["site-nav-cart-link", className].filter(Boolean).join(" ");
+
   return (
     <Link
       href="/cart"
-      className="site-nav-cart-link"
+      className={classes}
       aria-label={itemCount > 0 ? `Cart, ${itemCount} ${itemLabel}` : "Cart"}
     >
-      <span>Cart</span>
+      <CartIcon className="site-nav-cart-icon" />
       {itemCount > 0 ? (
         <span className={`site-cart-count-badge ${animateBadge ? "is-pulse" : ""}`}>
           {itemCount}

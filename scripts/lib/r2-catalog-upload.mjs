@@ -74,6 +74,39 @@ export function isR2CatalogUploadConfigured() {
   return readR2Env() !== null;
 }
 
+/** @param {string} objectKey */
+export async function headCatalogObjectInR2(objectKey) {
+  const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
+  const env = readR2Env();
+  if (!env) {
+    return false;
+  }
+  const key = String(objectKey ?? "").trim();
+  if (!key) {
+    return false;
+  }
+  const { S3Client } = await import("@aws-sdk/client-s3");
+  const client = new S3Client({
+    region: "auto",
+    endpoint: `https://${env.accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: env.accessKeyId,
+      secretAccessKey: env.secretAccessKey
+    }
+  });
+  try {
+    await client.send(
+      new HeadObjectCommand({
+        Bucket: env.bucketName,
+        Key: key
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function deleteCatalogObjectFromR2(objectKey) {
   const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
   if (!isR2CatalogUploadConfigured()) {

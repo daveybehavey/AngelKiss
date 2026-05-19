@@ -7,7 +7,7 @@ import type { ProductCategory } from "@/lib/admin/products";
  */
 
 const CUSTOM_PRINT_MUGS = {
-  path: "/marketing/home-gallery/stand-05.jpg",
+  path: "/marketing/home-gallery/stand-05.webp",
   alt: "Custom-printed mugs at the craft fair booth"
 } as const;
 

@@ -1,4 +1,10 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 type R2Config = {
@@ -64,6 +70,81 @@ export async function createR2PresignedPutForCatalogObject(options: {
   return getSignedUrl(client as any, cmd, {
     expiresIn: options.expiresSeconds ?? 3600
   });
+}
+
+/** @returns false when R2 is not configured or object is missing */
+export async function headR2CatalogObjectIfConfigured(objectKey: string): Promise<boolean> {
+  const c = readR2Config();
+  if (!c) {
+    return false;
+  }
+  const key = objectKey.trim().replace(/^\/+/, "");
+  if (!key) {
+    return false;
+  }
+  try {
+    await getS3Client().send(
+      new HeadObjectCommand({
+        Bucket: c.bucketName,
+        Key: key
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getR2CatalogObjectBufferIfConfigured(
+  objectKey: string
+): Promise<Buffer | null> {
+  const c = readR2Config();
+  if (!c) {
+    return null;
+  }
+  const key = objectKey.trim().replace(/^\/+/, "");
+  if (!key) {
+    return null;
+  }
+  try {
+    const res = await getS3Client().send(
+      new GetObjectCommand({
+        Bucket: c.bucketName,
+        Key: key
+      })
+    );
+    const body = res.Body;
+    if (!body) {
+      return null;
+    }
+    const bytes = await body.transformToByteArray();
+    return Buffer.from(bytes);
+  } catch {
+    return null;
+  }
+}
+
+export async function putR2CatalogObjectBufferIfConfigured(
+  objectKey: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  const c = readR2Config();
+  if (!c) {
+    return;
+  }
+  const key = objectKey.trim().replace(/^\/+/, "");
+  if (!key) {
+    return;
+  }
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: c.bucketName,
+      Key: key,
+      Body: body,
+      ContentType: contentType
+    })
+  );
 }
 
 /** Best-effort delete when an admin removes a catalog image (mirrors Supabase remove). */

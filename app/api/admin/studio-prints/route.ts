@@ -1,5 +1,6 @@
 import { assertAdminFromRequest } from "@/lib/auth/admin";
 import { STUDIO_GALLERY_STORAGE_PREFIX } from "@/lib/admin/images";
+import { ensureCatalogGridVariantInR2 } from "@/lib/server/catalog-grid-variant";
 import { badRequest, serverError, unauthorized } from "@/lib/http/json";
 import { formatSearchTagsForStorage } from "@/lib/storefront/parse-studio-print-search-tags";
 import { listStudioPrintsAdmin } from "@/lib/storefront/studio-prints";
@@ -100,6 +101,10 @@ export async function POST(request: Request) {
     if (error || !data) {
       return badRequest(error?.message ?? "Failed to create studio print");
     }
+
+    void ensureCatalogGridVariantInR2(body.storage_path.trim()).catch(() => {
+      /* best-effort */
+    });
 
     return NextResponse.json({ print: data }, { status: 201 });
   } catch (error) {

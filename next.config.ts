@@ -47,6 +47,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [72, 75],
     deviceSizes: [640, 750, 828, 1080, 1200],
     imageSizes: [96, 128, 160, 256, 384],
     /** Long browser/CDN cache for `/_next/image` URLs (params change when source changes). */

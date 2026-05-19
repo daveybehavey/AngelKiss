@@ -63,16 +63,64 @@ export default function HomePage() {
         <HomeMarketGallery />
       </ViewportDeferredMount>
 
-      <section className="panel home-signature" aria-label="A note from the maker">
+      <section className="home-market-bridge" aria-label="Shop after the market">
+        <div className="home-market-bridge-inner">
+          <div className="home-market-bridge-copy">
+            <p className="home-section-eyebrow">At the market</p>
+            <h2 className="home-market-bridge-title">Shop what you saw at the booth</h2>
+            <p className="home-market-bridge-subline">
+              Same mugs, prints, and crochet—order online anytime between events.
+            </p>
+            <nav className="home-market-bridge-links" aria-label="Shop by category">
+              <Link
+                href="/shop?category=custom_sublimation&sublimation_mode=customer_upload"
+                className="home-market-bridge-link"
+              >
+                Custom photo gifts
+              </Link>
+              <Link href="/gallery" className="home-market-bridge-link">
+                Our print designs
+              </Link>
+              <Link
+                href="/shop?category=handmade_crochet_knit"
+                className="home-market-bridge-link"
+              >
+                Handmade crochet
+              </Link>
+            </nav>
+          </div>
+          <figure className="home-market-bridge-thumb" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/marketing/home-gallery/stand-05.webp"
+              alt=""
+              width={320}
+              height={240}
+              loading="lazy"
+              decoding="async"
+            />
+          </figure>
+        </div>
+      </section>
+
+      <section className="panel home-signature" aria-label="Meet the maker">
         <div className="home-signature-grid">
           <div className="home-signature-note">
             <p className="home-signature-kicker">A note from the maker</p>
-            <h2 className="home-signature-title">Little details matter here.</h2>
+            <h2 className="home-signature-title">Hi, I&apos;m Cydney</h2>
             <p className="home-signature-copy">
-              Every listing is designed to feel personal—whether you’re choosing a one-of-a-kind
-              crochet piece or uploading a favorite photo for a custom print. If anything looks
-              unclear for printing, we’ll reach out before we make it.
+              I make cozy crochet and custom photo gifts on Vancouver Island—online between
+              markets, with the same care I bring to the booth.{" "}
+              <Link href="/about" className="inline-text-link">
+                More about me
+              </Link>
+              .
             </p>
+            <ul className="home-signature-trust" aria-label="Store assurances">
+              <li>Secure PayPal checkout</li>
+              <li>Ships across Canada</li>
+              <li>Handmade &amp; made-to-order in one shop</li>
+            </ul>
             <div className="button-row">
               <Link
                 href="/shop?category=custom_sublimation&sublimation_mode=customer_upload"
@@ -84,42 +132,33 @@ export default function HomePage() {
                 Shop handmade crochet
               </Link>
             </div>
+            <ol className="home-signature-steps" aria-label="Custom photo prints in 3 steps">
+              <li>
+                <strong>Upload</strong>
+                <p>One photo and any notes on the product page.</p>
+              </li>
+              <li>
+                <strong>Pay</strong>
+                <p>Checkout with PayPal—quick on mobile.</p>
+              </li>
+              <li>
+                <strong>We make it</strong>
+                <p>Printed or stitched with care, then shipped.</p>
+              </li>
+            </ol>
           </div>
-          <ol className="home-signature-steps" aria-label="Custom photo prints in 3 steps">
-            <li>
-              <strong>1) Upload</strong>
-              <p>Choose one photo and add any notes (names, colors, vibe).</p>
-            </li>
-            <li>
-              <strong>2) Checkout</strong>
-              <p>Pay securely with PayPal—mobile-friendly and quick.</p>
-            </li>
-            <li>
-              <strong>3) We make it</strong>
-              <p>We prep, print, and ship from Vancouver Island.</p>
-            </li>
-          </ol>
+          <figure className="home-signature-photo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/marketing/home-gallery/stand-13.webp"
+              alt="Cydney at the AnglKiss Creations market booth"
+              width={1200}
+              height={900}
+              loading="lazy"
+              decoding="async"
+            />
+          </figure>
         </div>
-      </section>
-
-      <section className="home-value-strip" aria-label="Store assurances">
-        <article className="home-value-item home-value-item-accent">
-          <span className="home-value-glyph" aria-hidden="true" />
-          <p className="home-value-title">Easy to Order</p>
-          <p className="home-value-copy">Clear listings, simple options, and a smooth checkout.</p>
-        </article>
-        <article className="home-value-item home-value-item-warm">
-          <span className="home-value-glyph home-value-glyph-alt" aria-hidden="true" />
-          <p className="home-value-title">Handmade + Made-to-Order</p>
-          <p className="home-value-copy">
-            One-of-a-kind crochet pieces and custom print products in one shop.
-          </p>
-        </article>
-        <article className="home-value-item home-value-item-brand">
-          <span className="home-value-glyph home-value-glyph-brand" aria-hidden="true" />
-          <p className="home-value-title">Ships Across Canada</p>
-          <p className="home-value-copy">Shipping rates are shown at checkout by destination.</p>
-        </article>
       </section>
 
       <section className="home-gift-finder" aria-label="Gift finder">
@@ -128,21 +167,24 @@ export default function HomePage() {
             <p className="home-gift-finder-kicker">Gift finder</p>
             <h2>Shop by “who is it for?”</h2>
             <p className="home-gift-finder-copy">
-              A quick way to browse the cutest ideas—especially for custom photo keepsakes.
+              Quick picks for custom photo keepsakes and cozy handmade gifts.
             </p>
           </div>
           <div className="home-gift-finder-chips">
             <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload" className="chip">
-              For couples 💞
+              For couples
             </Link>
             <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload" className="chip">
-              For parents 👨‍👩‍👧‍👦
+              For parents
             </Link>
             <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload" className="chip">
-              For pet lovers 🐾
+              For pet lovers
             </Link>
             <Link href="/shop?category=handmade_crochet_knit" className="chip">
-              Cozy handmade 🧶
+              Cozy handmade
+            </Link>
+            <Link href="/shop" className="chip chip-accent">
+              See all gifts
             </Link>
           </div>
         </div>
@@ -154,84 +196,84 @@ export default function HomePage() {
           <h2 className="home-section-title">Find your next favorite</h2>
         </div>
 
-        <section className="grid-2 home-collections" aria-label="Shop collections">
-          <article className="card home-card">
-            <p className="card-kicker">Collection</p>
-            <h2>Custom Photo Prints</h2>
-            <p>
-              Upload a photo, add notes, and place your order in minutes. Perfect for personalized
-              mugs, tumblers, and bags.
-            </p>
-            <Link href="/shop?category=custom_sublimation&sublimation_mode=customer_upload">
-              Shop custom-print items
-            </Link>
+        <section className="home-collections-bento" aria-label="Shop collections">
+          <article className="home-bento-card home-bento-card--large">
+            <div className="home-bento-card-media">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/marketing/home-gallery/stand-05.webp"
+                alt="Custom-printed mugs at the craft fair booth"
+                width={800}
+                height={600}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div className="home-bento-card-body">
+              <p className="card-kicker">Collection</p>
+              <h2>Custom photo prints</h2>
+              <p>Upload a photo for mugs, tumblers, bags, and more—made to order.</p>
+              <Link
+                href="/shop?category=custom_sublimation&sublimation_mode=customer_upload"
+                className="btn btn-outline btn-sm"
+              >
+                Shop photo-upload prints
+              </Link>
+            </div>
           </article>
 
-          <article className="card home-card">
-            <p className="card-kicker">Collection</p>
-            <h2>Ready-Made Print Designs</h2>
-            <p>
-              Choose one of our in-house designs and we will make it to order just for you.
-            </p>
-            <Link href="/shop?category=custom_sublimation&sublimation_mode=ready_made_design">
-              Shop ready-made prints
-            </Link>
+          <article className="home-bento-card home-bento-card--small">
+            <div className="home-bento-card-body">
+              <p className="card-kicker">Collection</p>
+              <h2>Ready-made print designs</h2>
+              <p>In-house studio art—pick a design and we print it for you.</p>
+              <Link href="/gallery" className="btn btn-outline btn-sm">
+                Browse designs
+              </Link>
+            </div>
           </article>
 
-          <article className="card home-card">
-            <p className="card-kicker">Collection</p>
-            <h2>Handmade Crochet & Knit</h2>
-            <p>
-              Limited-stock handmade pieces crafted with care. Sold-out items stay visible so you
-              can still browse the full style.
-            </p>
-            <Link href="/shop?category=handmade_crochet_knit">Shop handmade</Link>
+          <article className="home-bento-card home-bento-card--wide">
+            <div className="home-bento-card-media">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/marketing/products/product-01.jpg"
+                alt="Crochet frog with a small plant in a cozy handmade setup"
+                width={800}
+                height={500}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div className="home-bento-card-body">
+              <p className="card-kicker">Collection</p>
+              <h2>Handmade crochet &amp; knit</h2>
+              <p>Limited batches—sold-out pieces stay visible for restock browsing.</p>
+              <Link href="/shop?category=handmade_crochet_knit" className="btn btn-outline btn-sm">
+                Shop crochet &amp; knit
+              </Link>
+            </div>
           </article>
         </section>
       </div>
 
-      <section className="home-process panel" aria-label="How your order comes to life">
-        <div className="home-process-head">
-          <p className="card-kicker">How It Works</p>
-          <h2>How Your Order Comes to Life</h2>
+      <section className="home-closing-cta panel" aria-label="Start shopping">
+        <h2 className="home-closing-cta-title">Ready to find something special?</h2>
+        <div className="button-row home-closing-cta-actions">
+          <Link href="/shop" className="btn btn-primary">
+            Shop all
+          </Link>
+          <a href="mailto:anglkisscreations@gmail.com" className="btn btn-outline">
+            Email us
+          </a>
         </div>
-        <ol className="home-process-list">
-          <li className="home-process-step">
-            <strong>1. Choose your favorite</strong>
-            <p>Pick handmade crochet, a ready-made print design, or a custom photo listing.</p>
-          </li>
-          <li className="home-process-step">
-            <strong>2. Add your details</strong>
-            <p>For custom items, upload one image and include any notes on the product page.</p>
-          </li>
-          <li className="home-process-step">
-            <strong>3. Checkout securely</strong>
-            <p>Pay with PayPal and receive clear updates as your order moves forward.</p>
-          </li>
-          <li className="home-process-step">
-            <strong>4. We make and ship it</strong>
-            <p>Your order is prepared with care and shipped with tracking when available.</p>
-          </li>
-        </ol>
-      </section>
-
-      <section className="grid-2 home-policies" aria-label="Shipping and policy highlights">
-        <article className="card home-card">
-          <p className="card-kicker">Shipping</p>
-          <h2>Simple, transparent shipping</h2>
-          <p>
-            Shipping is calculated at checkout by destination and order size, with free shipping
-            available when your order qualifies.
-          </p>
-        </article>
-
-        <article className="card home-card">
-          <p className="card-kicker">Returns</p>
-          <h2>Clear return policy</h2>
-          <p>
-            Return details are shown during checkout so there are no surprises before payment.
-          </p>
-        </article>
+        <p className="home-closing-cta-policies">
+          <Link href="/shipping">Shipping</Link>
+          <span aria-hidden="true"> · </span>
+          <Link href="/returns">Returns</Link>
+          <span aria-hidden="true"> · </span>
+          <Link href="/privacy">Privacy</Link>
+        </p>
       </section>
     </main>
   );

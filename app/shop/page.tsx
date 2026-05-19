@@ -4,15 +4,22 @@ import { ShopStudioPrintBanner } from "@/components/storefront/shop-studio-print
 import { loadCachedShopPageData } from "@/lib/server/storefront-data-cache";
 import type { SublimationMode } from "@/lib/storefront/products";
 import { buildShopHref } from "@/lib/storefront/shop-urls";
-import {
-  SHOP_DEFAULT_DESCRIPTION,
-  SHOP_HANDMADE_DESCRIPTION,
-  SHOP_READY_MADE_DESCRIPTION,
-  SHOP_SUBLIMATION_DESCRIPTION,
-  SHOP_UPLOAD_DESCRIPTION
-} from "@/lib/seo/shop-descriptions";
+import { resolveShopPageSeo } from "@/lib/seo/shop-descriptions";
+import { buildShopCollectionJsonLd } from "@/lib/seo/shop-collection-json-ld";
 import type { Metadata } from "next";
 import Link from "next/link";
+
+function shopSiteOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!raw) {
+    return "https://anglkisscreations.ca";
+  }
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return "https://anglkisscreations.ca";
+  }
+}
 
 /** ISR seconds — literal required by Next.js; keep in sync with `STOREFRONT_DATA_REVALIDATE_SEC` in `lib/server/storefront-data-cache.ts`. */
 export const revalidate = 1800;
@@ -45,31 +52,24 @@ export async function generateMetadata({
   const params = await searchParams;
   const category = normalizeCategoryFilter(params.category);
   const sublimationMode = normalizeSublimationModeFilter(params.sublimation_mode);
+  const { title, description } = resolveShopPageSeo(category, sublimationMode);
 
-  let title = "Shop";
-  let description = SHOP_DEFAULT_DESCRIPTION;
-
-  if (sublimationMode === "customer_upload") {
-    title = "Shop Upload-Your-Photo Sublimation";
-    description = SHOP_UPLOAD_DESCRIPTION;
-  } else if (sublimationMode === "ready_made_design") {
-    title = "Shop Ready-Made Sublimation Designs";
-    description = SHOP_READY_MADE_DESCRIPTION;
-  } else if (category === "custom_sublimation") {
-    title = "Shop Sublimation Prints";
-    description = SHOP_SUBLIMATION_DESCRIPTION;
-  } else if (category === "handmade_crochet_knit") {
-    title = "Shop Crochet & Knit";
-    description = SHOP_HANDMADE_DESCRIPTION;
-  }
+  const canonicalPath = buildShopHref({
+    category,
+    sublimationMode: sublimationMode
+  });
 
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalPath
+    },
     openGraph: {
       title,
       description,
-      type: "website"
+      type: "website",
+      url: canonicalPath
     },
     twitter: {
       card: "summary_large_image",
@@ -105,15 +105,36 @@ export default async function ShopPage({
     readyMade: readyMadeCount
   } = overview;
 
+  const canonicalPath = buildShopHref({
+    category: categoryFilter,
+    sublimationMode: sublimationModeFilter
+  });
+
+  const { title: collectionTitle, description: collectionDescription } = resolveShopPageSeo(
+    categoryFilter,
+    sublimationModeFilter
+  );
+
+  const collectionJsonLd = buildShopCollectionJsonLd({
+    pageTitle: collectionTitle,
+    description: collectionDescription,
+    canonicalPath,
+    siteOrigin: shopSiteOrigin()
+  });
+
   return (
     <main className="page-main shop-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJsonLd) }}
+      />
       <section className="panel shop-hero shop-hero-enhanced">
         <div className="shop-hero-glow" aria-hidden="true" />
         <p className="shop-hero-eyebrow">The collection</p>
         <h1>Shop AnglKiss Creations</h1>
         <p className="shop-hero-lead">
-          Handmade crochet and knit, ready-made print designs, and custom photo products—all in
-          one place.
+          Crochet &amp; knit live in one aisle; custom prints (your photo or our designs) live in
+          another—pick a category below.
         </p>
       </section>
 
@@ -126,12 +147,12 @@ export default async function ShopPage({
           <p className="shop-overview-copy">Crochet & knit pieces currently listed.</p>
         </article>
         <article className="shop-overview-card shop-overview-card-tilt">
-          <p className="shop-overview-kicker">Custom Upload</p>
+          <p className="shop-overview-kicker">Your photo</p>
           <p className="shop-overview-value">{customUploadCount}</p>
           <p className="shop-overview-copy">Photo-upload products ready for personalization.</p>
         </article>
         <article className="shop-overview-card shop-overview-card-tilt">
-          <p className="shop-overview-kicker">Ready-Made Prints</p>
+          <p className="shop-overview-kicker">Ready-made prints</p>
           <p className="shop-overview-value">{readyMadeCount}</p>
           <p className="shop-overview-copy">In-house designs made to order.</p>
         </article>
@@ -159,14 +180,14 @@ export default async function ShopPage({
           className={`chip ${categoryFilter === "custom_sublimation" ? "active" : ""}`}
           prefetch={false}
         >
-          Sublimation ({customSublimationCount})
+          Custom prints ({customSublimationCount})
         </Link>
       </section>
 
       {categoryFilter === "custom_sublimation" || sublimationModeFilter !== null ? (
         <section
           className="shop-toolbar shop-toolbar-secondary"
-          aria-label="Sublimation type filters"
+          aria-label="Custom print type filters"
         >
           <Link
             href={buildShopHref({ category: "custom_sublimation" })}
@@ -177,7 +198,7 @@ export default async function ShopPage({
             }`}
             prefetch={false}
           >
-            All Sublimation ({customSublimationCount})
+            All custom prints ({customSublimationCount})
           </Link>
           <Link
             href={buildShopHref({
@@ -187,7 +208,7 @@ export default async function ShopPage({
             className={`chip ${sublimationModeFilter === "customer_upload" ? "active" : ""}`}
             prefetch={false}
           >
-            Custom Photo Upload ({customUploadCount})
+            Your photo ({customUploadCount})
           </Link>
           <Link
             href={buildShopHref({
@@ -197,15 +218,28 @@ export default async function ShopPage({
             className={`chip ${sublimationModeFilter === "ready_made_design" ? "active" : ""}`}
             prefetch={false}
           >
-            Ready-Made Prints ({readyMadeCount})
+            Ready-made prints ({readyMadeCount})
           </Link>
         </section>
       ) : null}
 
-      <ShopProductGrid items={filteredItems} />
+      <section aria-labelledby="shop-products-heading">
+        <h2 id="shop-products-heading" className="sr-only">
+          Products
+        </h2>
+        <ShopProductGrid items={filteredItems} />
+      </section>
 
       {filteredItems.length === 0 ? (
-        <p className="shop-empty">No live products right now.</p>
+        <section className="panel shop-empty-panel" aria-live="polite">
+          <p className="shop-empty-title">No products match right now</p>
+          <p className="shop-empty-copy">
+            Try another category or check back soon—new pieces are added regularly.
+          </p>
+          <Link href="/shop" className="btn btn-outline btn-sm">
+            View all products
+          </Link>
+        </section>
       ) : null}
     </main>
   );

@@ -57,5 +57,6 @@ export const WORKER_SECRET_KEYS = [
 /** Baked into the OpenNext / Next production build (public). */
 export const PRODUCTION_BUILD_PUBLIC_KEYS = [
   "NEXT_PUBLIC_IMAGE_CDN_BASE_URL",
+  "NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS",
   "NEXT_PUBLIC_PAYPAL_CLIENT_ID"
 ];

@@ -51,7 +51,6 @@ if (platform() === "win32" && existsSync(ps) && isWslHealthy()) {
     "Bypass",
     "-File",
     ps,
-    "-Command",
     "npm install && npm run build:clean"
   ]);
 } else {

@@ -39,6 +39,9 @@ export function applyProductionBuildEnv(cwd = process.cwd()) {
   const cdnNorm = normalizeImageCdnBaseUrl(cdnRaw);
   if (cdnNorm) {
     process.env.NEXT_PUBLIC_IMAGE_CDN_BASE_URL = cdnNorm;
+    if (!process.env.NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS?.trim()) {
+      process.env.NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS = "1";
+    }
   }
 
   const applied = [];

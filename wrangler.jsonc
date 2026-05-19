@@ -7,11 +7,10 @@
   "workers_dev": false,
   "preview_urls": false,
   // Keep in sync with lib/site-domains.ts → WORKER_CUSTOM_DOMAIN_HOSTS
+  // .ca: zone routes (existing DNS — custom_domain fails with Cloudflare error 100117)
   "routes": [
-    { "pattern": "anglkisscreations.ca", "custom_domain": true },
-    { "pattern": "www.anglkisscreations.ca", "custom_domain": true },
-    { "pattern": "anglkisscreations.com", "custom_domain": true },
-    { "pattern": "www.anglkisscreations.com", "custom_domain": true },
+    { "pattern": "anglkisscreations.ca/*", "zone_name": "anglkisscreations.ca" },
+    { "pattern": "www.anglkisscreations.ca/*", "zone_name": "anglkisscreations.ca" },
     { "pattern": "angelkisscreations.com", "custom_domain": true },
     { "pattern": "www.angelkisscreations.com", "custom_domain": true }
   ],

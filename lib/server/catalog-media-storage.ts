@@ -1,4 +1,5 @@
 import { getProductImagesBucket, normalizeStoragePathForBucket } from "@/lib/admin/images";
+import { deleteCatalogGridVariantInR2 } from "@/lib/server/catalog-grid-variant";
 import {
   deleteR2CatalogObjectIfConfigured,
   isR2ProductMediaUploadConfigured
@@ -33,6 +34,7 @@ export async function deleteCatalogMediaObject(
 ): Promise<void> {
   const bucket = getProductImagesBucket();
   const key = normalizeStoragePathForBucket(storagePath, bucket);
+  await deleteCatalogGridVariantInR2(storagePath);
   await deleteR2CatalogObjectIfConfigured(key);
   try {
     await supabase.storage.from(bucket).remove([key]);

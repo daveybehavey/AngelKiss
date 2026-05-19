@@ -1,22 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ProductCategory } from "@/lib/admin/products";
 import type { PublicProductSummary } from "@/lib/storefront/products";
-import { formatShopperProductTitle } from "@/lib/storefront/product-display";
 import {
-  storefrontImageSrcOrNull,
-  storefrontImageUnoptimized
+  formatShopperProductTitle,
+  formatStorefrontCategory
+} from "@/lib/storefront/product-display";
+import {
+  getStorefrontGridImageUrl,
+  storefrontGridImageUnoptimized
 } from "@/lib/storefront/storefront-image-src";
 
 function formatMoney(cents: number, currency: string): string {
   return `${(cents / 100).toFixed(2)} ${currency}`;
-}
-
-function formatCategory(category: ProductCategory): string {
-  if (category === "custom_sublimation") {
-    return "Sublimation";
-  }
-  return "Handmade";
 }
 
 type Props = {
@@ -49,7 +44,7 @@ export function HomeFeaturedProducts({ items }: Props) {
           <ul className="home-featured-grid">
             {items.map((item, index) => {
               const displayName = formatShopperProductTitle(item.name);
-              const primarySrc = storefrontImageSrcOrNull(item.primary_image_url);
+              const primarySrc = getStorefrontGridImageUrl(item.primary_image_url);
               return (
                 <li
                   key={item.id}
@@ -63,20 +58,20 @@ export function HomeFeaturedProducts({ items }: Props) {
                           src={primarySrc}
                           alt={item.primary_image_alt ?? displayName}
                           fill
-                          sizes="(max-width: 700px) 46vw, (max-width: 1100px) 31vw, 260px"
+                          sizes="(max-width: 700px) 46vw, (max-width: 1100px) 31vw, 240px"
                           quality={72}
                           className="home-featured-photo"
-                          loading={index === 0 ? "eager" : "lazy"}
+                          loading={index < 2 ? "eager" : "lazy"}
                           priority={index === 0}
                           fetchPriority={index === 0 ? "high" : "low"}
-                          unoptimized={storefrontImageUnoptimized(primarySrc)}
+                          unoptimized={storefrontGridImageUnoptimized(primarySrc)}
                         />
                       ) : (
                         <div className="home-featured-placeholder">Photo soon</div>
                       )}
                     </div>
                     <div className="home-featured-body">
-                      <p className="home-featured-meta">{formatCategory(item.category)}</p>
+                      <p className="home-featured-meta">{formatStorefrontCategory(item.category)}</p>
                       <h3>{displayName}</h3>
                       <p className="home-featured-price">
                         {formatMoney(item.base_price_cents, item.currency)}

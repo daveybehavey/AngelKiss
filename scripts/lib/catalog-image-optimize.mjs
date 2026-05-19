@@ -5,12 +5,36 @@ import sharp from "sharp";
 
 export const DEFAULT_MAX_EDGE = 1600;
 export const DEFAULT_WEBP_QUALITY = 78;
+/** Grid card / thumb sibling in R2 (`*_grid.webp`). */
+export const DEFAULT_GRID_MAX_EDGE = 384;
+export const DEFAULT_GRID_WEBP_QUALITY = 75;
 const INPUT_PIXEL_LIMIT = 4096 * 4096;
 
 const RASTER_EXT = /\.(jpe?g|png|gif|webp|tiff?|heic|heif)$/i;
 
 export function isRasterCatalogKey(objectKey) {
   return RASTER_EXT.test(String(objectKey ?? ""));
+}
+
+export function isCatalogGridObjectKey(objectKey) {
+  return /_grid\.webp$/i.test(String(objectKey ?? "").trim());
+}
+
+/** e.g. `products/foo.webp` → `products/foo_grid.webp` */
+export function catalogGridObjectKey(masterObjectKey) {
+  const key = String(masterObjectKey ?? "")
+    .trim()
+    .replace(/^\/+/, "");
+  if (!key || isCatalogGridObjectKey(key) || key.startsWith("templates/")) {
+    return null;
+  }
+  if (!isRasterCatalogKey(key)) {
+    return null;
+  }
+  if (/\.webp$/i.test(key)) {
+    return key.replace(/\.webp$/i, "_grid.webp");
+  }
+  return key.replace(/\.(jpe?g|png|gif|tiff?|heic|heif)$/i, "_grid.webp");
 }
 
 export function targetWebpObjectKey(objectKey) {
@@ -76,6 +100,17 @@ export async function optimizeCatalogImageBuffer(input, options = {}) {
     .toBuffer();
 
   return { buffer: out, width: w, height: h, sourceWidth: srcW, sourceHeight: srcH };
+}
+
+/**
+ * @param {Buffer} input
+ * @param {{ maxEdge?: number; quality?: number }} [options]
+ */
+export async function optimizeCatalogGridImageBuffer(input, options = {}) {
+  return optimizeCatalogImageBuffer(input, {
+    maxEdge: options.maxEdge ?? DEFAULT_GRID_MAX_EDGE,
+    quality: options.quality ?? DEFAULT_GRID_WEBP_QUALITY
+  });
 }
 
 /**

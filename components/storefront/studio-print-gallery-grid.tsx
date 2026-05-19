@@ -1,9 +1,13 @@
 "use client";
 
 import {
+  getStorefrontGridImageUrl,
+  STOREFRONT_THUMB_IMAGE_WIDTH,
+  storefrontGridImageUnoptimized
+} from "@/lib/storefront/storefront-image-src";
+import {
   shopHrefForStudioPrint,
-  studioPrintImageSrcForNextImage,
-  studioPrintImageUnoptimized
+  studioPrintImageSrcForNextImage
 } from "@/lib/storefront/studio-print-client";
 import type { PublicStudioPrint } from "@/lib/storefront/studio-prints";
 import Image from "next/image";
@@ -29,9 +33,11 @@ export function StudioPrintGalleryGrid({
 
   return (
     <ul className="studio-print-gallery-grid" aria-label="Studio prints">
-      {prints.map((print) => {
+      {prints.map((print, index) => {
         const selected = selectedPrintId === print.id;
-        const thumbSrc = studioPrintImageSrcForNextImage(print.image_url);
+        const thumbSrc =
+          getStorefrontGridImageUrl(print.image_url, { width: STOREFRONT_THUMB_IMAGE_WIDTH }) ??
+          studioPrintImageSrcForNextImage(print.image_url);
         const href = shopHrefForStudioPrint(print);
 
         const tileInner = (
@@ -40,11 +46,12 @@ export function StudioPrintGalleryGrid({
               <Image
                 src={thumbSrc}
                 alt={print.alt_text?.trim() || print.title}
-                width={200}
-                height={200}
+                fill
                 className="studio-print-gallery-thumb-img"
                 sizes="(max-width: 520px) 45vw, 200px"
-                unoptimized={studioPrintImageUnoptimized(thumbSrc)}
+                loading={index < 8 ? "eager" : "lazy"}
+                decoding="async"
+                unoptimized={storefrontGridImageUnoptimized(thumbSrc)}
               />
             </span>
             <span className="studio-print-gallery-tile-title">{print.title}</span>

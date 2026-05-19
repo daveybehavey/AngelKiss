@@ -4,6 +4,7 @@ import { platform } from "node:os";
 import { resolve } from "node:path";
 import { applyProductionBuildEnv } from "./apply-production-build-env.mjs";
 import { applyCloudflareAuthForWrangler } from "./cloudflare-wrangler-auth.mjs";
+import { PRODUCTION_BUILD_PUBLIC_KEYS } from "./lib/load-deploy-env.mjs";
 
 applyCloudflareAuthForWrangler();
 applyProductionBuildEnv();
@@ -62,9 +63,15 @@ function wslDeployCommand() {
   if (u) {
     exports.push(`export NEXT_PUBLIC_SITE_URL=${bashSingleQuote(u)}`);
   }
-  const cdn = process.env.NEXT_PUBLIC_IMAGE_CDN_BASE_URL?.trim();
-  if (cdn) {
-    exports.push(`export NEXT_PUBLIC_IMAGE_CDN_BASE_URL=${bashSingleQuote(cdn)}`);
+  for (const key of PRODUCTION_BUILD_PUBLIC_KEYS) {
+    const v = process.env[key]?.trim();
+    if (v) {
+      exports.push(`export ${key}=${bashSingleQuote(v)}`);
+    }
+  }
+  const resize = process.env.NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE?.trim();
+  if (resize) {
+    exports.push(`export NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE=${bashSingleQuote(resize)}`);
   }
   const email = process.env.CLOUDFLARE_EMAIL?.trim();
   const apiKey = process.env.CLOUDFLARE_API_KEY?.trim();
@@ -79,13 +86,13 @@ function wslDeployCommand() {
 
 if (platform() === "win32" && existsSync(ps) && isWslHealthy()) {
   console.log("deploy-best: using WSL (recommended on Windows + OneDrive)…");
+  // Pass command positionally — `-Command` conflicts with powershell.exe's own -Command flag.
   run("powershell.exe", [
     "-NoProfile",
     "-ExecutionPolicy",
     "Bypass",
     "-File",
     ps,
-    "-Command",
     wslDeployCommand()
   ]);
 } else {

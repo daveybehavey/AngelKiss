@@ -13,6 +13,11 @@
  *   npm run admin:backfill-catalog-images -- --min-kb 400
  *   npm run admin:backfill-catalog-images -- --force
  *   npm run admin:backfill-catalog-images -- --include-templates
+ *   npm run admin:backfill-catalog-images -- --grid --dry-run
+ *   npm run admin:backfill-catalog-images -- --grid --grid-width 384
+ *
+ * Grid mode writes `*_grid.webp` siblings in R2 (no Postgres changes). After backfill, set
+ * NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS=1 at build time and redeploy.
  */
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -20,8 +25,10 @@ import sharp from "sharp";
 import { loadEnvFile, envPath } from "./lib/load-env-file.mjs";
 import { collectCatalogStoragePaths, normalizeObjectKey } from "./lib/catalog-storage-paths.mjs";
 import {
+  catalogGridObjectKey,
   DEFAULT_MAX_EDGE,
   isRasterCatalogKey,
+  optimizeCatalogGridImageBuffer,
   optimizeCatalogImageBuffer,
   remapDbStoragePath,
   shouldSkipOptimization,
@@ -30,6 +37,7 @@ import {
 import {
   deleteCatalogObjectFromR2,
   getCatalogObjectFromR2,
+  headCatalogObjectInR2,
   isR2CatalogUploadConfigured,
   putCatalogObjectToR2
 } from "./lib/r2-catalog-upload.mjs";
@@ -80,15 +88,21 @@ function parseArgs(argv) {
   let force = false;
   let minKb = 0;
   let includeTemplates = false;
+  let gridOnly = false;
+  let gridWidth = 384;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--dry-run") dryRun = true;
     else if (a === "--force") force = true;
+    else if (a === "--grid") gridOnly = true;
     else if (a === "--include-templates") includeTemplates = true;
     else if (a === "--limit" && argv[i + 1]) limit = Math.max(0, parseInt(argv[++i], 10) || 0);
     else if (a === "--min-kb" && argv[i + 1]) minKb = Math.max(0, parseInt(argv[++i], 10) || 0);
+    else if (a === "--grid-width" && argv[i + 1]) {
+      gridWidth = Math.max(64, Math.min(800, parseInt(argv[++i], 10) || 384));
+    }
   }
-  return { dryRun, limit, force, minBytes: minKb * 1024, includeTemplates };
+  return { dryRun, limit, force, minBytes: minKb * 1024, includeTemplates, gridOnly, gridWidth };
 }
 
 /**
@@ -185,13 +199,63 @@ async function main() {
     list = list.slice(0, opts.limit);
   }
 
+  const modeLabel = opts.gridOnly ? `grid ${opts.gridWidth}px WebP siblings` : "master WebP optimize";
   console.log(
-    `backfill-catalog-images: ${list.length} raster key(s) to scan (${keys.size} total in DB${templateKeys.length ? `, ${templateKeys.length} template mockup(s) skipped` : ""})${opts.dryRun ? " (dry-run)" : ""}`
+    `backfill-catalog-images: ${list.length} raster key(s) — ${modeLabel} (${keys.size} total in DB${templateKeys.length ? `, ${templateKeys.length} template mockup(s) skipped` : ""})${opts.dryRun ? " (dry-run)" : ""}`
   );
 
   let optimized = 0;
   let skipped = 0;
   let failed = 0;
+
+  if (opts.gridOnly) {
+    for (const objectKey of list) {
+      const label = objectKey;
+      try {
+        const gridKey = catalogGridObjectKey(objectKey);
+        if (!gridKey) {
+          skipped++;
+          continue;
+        }
+        if (!opts.force && (await headCatalogObjectInR2(gridKey))) {
+          skipped++;
+          continue;
+        }
+        const dl = await downloadCatalogBytes(supabase, bucket, objectKey);
+        if (dl.error || !dl.buffer) {
+          console.warn(`  FAIL download ${label}: ${dl.error ?? "no data"}`);
+          failed++;
+          continue;
+        }
+        const encoded = await optimizeCatalogGridImageBuffer(dl.buffer, {
+          maxEdge: opts.gridWidth
+        });
+        const kbOut = Math.round(encoded.buffer.length / 1024);
+        const action = opts.dryRun ? "would write grid" : "write grid";
+        console.log(
+          `  ${action} ${gridKey} ← ${label} (${dl.source}) ${encoded.width}×${encoded.height} ${kbOut}KB`
+        );
+        if (opts.dryRun) {
+          optimized++;
+          continue;
+        }
+        await putCatalogObjectToR2({
+          Key: gridKey,
+          Body: encoded.buffer,
+          ContentType: "image/webp"
+        });
+        optimized++;
+      } catch (e) {
+        console.error(`  FAIL ${label}:`, e instanceof Error ? e.message : e);
+        failed++;
+      }
+    }
+    console.log(
+      `\nbackfill-catalog-images: done — ${opts.dryRun ? "would write" : "wrote"} ${optimized} grid variant(s), skipped ${skipped}, failed ${failed}`
+    );
+    if (failed) process.exit(1);
+    return;
+  }
 
   for (const objectKey of list) {
     const label = objectKey;
