@@ -266,15 +266,15 @@ button:focus-visible {
   transition: opacity 200ms ease;
 }
 
-/* Header wordmark: brighter rose/coral + semibold for contrast on velvet purple */
+/* Header wordmark: brighter rose/coral + bold for contrast on velvet purple */
 .site-header .brand-link {
-  font-weight: 600;
-  color: color-mix(in srgb, var(--brand-wordmark-from) 68%, white 32%);
+  font-weight: 700;
+  color: color-mix(in srgb, var(--brand-wordmark-from) 58%, white 42%);
   background-image: linear-gradient(
     115deg,
-    color-mix(in srgb, var(--brand-wordmark-from) 62%, white 38%) 0%,
-    color-mix(in srgb, var(--brand-wordmark-from) 42%, var(--brand-wordmark-to) 58%) 48%,
-    color-mix(in srgb, var(--brand-wordmark-to) 58%, white 42%) 100%
+    color-mix(in srgb, var(--brand-wordmark-from) 52%, white 48%) 0%,
+    color-mix(in srgb, var(--brand-wordmark-from) 34%, var(--brand-wordmark-to) 66%) 48%,
+    color-mix(in srgb, var(--brand-wordmark-to) 48%, white 52%) 100%
   );
 }
 
@@ -597,8 +597,47 @@ button:focus-visible {
     border-radius: 12px;
   }
 
+  /* Drawer panel is light (--bg-soft); override header nav ink (lavender on lavender). */
+  .site-nav-drawer[open] .site-nav-panel .site-nav a,
+  .site-nav-drawer[open] .site-nav-panel .site-nav .site-nav-drawer-link,
+  .site-header .site-nav-drawer[open] .site-nav-panel .site-nav a,
+  .site-header .site-nav-drawer[open] .site-nav-panel .site-nav .site-nav-drawer-link {
+    color: var(--text);
+    -webkit-text-fill-color: currentColor;
+    background-image: none;
+  }
+
+  .site-nav-drawer[open] .site-nav-panel .site-nav a .site-nav-text,
+  .site-header .site-nav-drawer[open] .site-nav-panel .site-nav a .site-nav-text {
+    color: inherit;
+    -webkit-text-fill-color: inherit;
+  }
+
+  .site-nav-drawer[open] .site-nav-panel .site-nav a:hover,
+  .site-header .site-nav-drawer[open] .site-nav-panel .site-nav a:hover,
+  .site-nav-drawer[open] .site-nav-panel .site-nav .site-nav-drawer-link:hover {
+    color: var(--brand-dark);
+    -webkit-text-fill-color: currentColor;
+    background: color-mix(in srgb, var(--accent-playful) 22%, var(--bg-soft) 78%);
+  }
+
+  .site-nav-drawer[open] .site-nav-panel .site-nav a:focus-visible,
+  .site-header .site-nav-drawer[open] .site-nav-panel .site-nav a:focus-visible {
+    color: var(--brand-dark);
+    -webkit-text-fill-color: currentColor;
+    outline-color: color-mix(in srgb, var(--brand) 55%, var(--accent) 45%);
+  }
+
+  .site-nav-drawer[open] .site-nav-panel .site-nav a:active,
+  .site-header .site-nav-drawer[open] .site-nav-panel .site-nav a:active,
   .site-nav-drawer[open] .site-nav-drawer-link:active {
+    color: var(--brand-dark);
+    -webkit-text-fill-color: currentColor;
     background: color-mix(in srgb, var(--accent-playful) 28%, var(--bg-soft) 72%);
+  }
+
+  .site-nav-drawer[open] .site-nav-panel-foot {
+    color: var(--muted);
   }
 
   .site-nav-drawer[open] .site-nav-checkout-link--desktop-only {
