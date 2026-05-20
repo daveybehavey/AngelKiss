@@ -1137,7 +1137,7 @@ button:focus-visible {
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--bg-soft) 92%, var(--brand) 8%);
   box-shadow: var(--surface-shadow-soft);
-  padding: clamp(0.75rem, 1.6vw, 1rem);
+  padding: clamp(0.85rem, 1.8vw, 1.1rem);
 }
 
 .home-gift-finder-inner {
@@ -1179,8 +1179,8 @@ button:focus-visible {
 }
 
 .home-gift-finder-chips .chip {
-  min-height: 40px;
-  padding: 0.28rem 0.68rem;
+  min-height: 44px;
+  padding: 0.32rem 0.72rem;
   font-size: 0.9rem;
 }
 
@@ -1389,7 +1389,7 @@ button:focus-visible {
     );
   box-shadow: var(--surface-shadow);
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 
 .home-featured-head {
@@ -1397,7 +1397,7 @@ button:focus-visible {
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 0.75rem 1rem;
+  gap: 0.85rem 1.15rem;
 }
 
 .home-featured-eyebrow {
@@ -1426,6 +1426,7 @@ button:focus-visible {
 
 .home-featured-cta {
   flex-shrink: 0;
+  align-self: center;
 }
 
 .home-featured-empty {
@@ -1447,7 +1448,7 @@ button:focus-visible {
   padding: 0;
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
 }
 
 .home-featured-card {
@@ -1494,6 +1495,7 @@ button:focus-visible {
   color: inherit;
   text-align: left;
   cursor: zoom-in;
+  touch-action: manipulation;
 }
 
 .home-featured-image-trigger:focus-visible {
@@ -1501,7 +1503,7 @@ button:focus-visible {
   outline-offset: -2px;
 }
 
-/* Featured product cards: match shop grid (4:5 cover). Studio / market galleries stay contain. */
+/* Featured product cards: full product in frame (contain). Studio / market galleries unchanged. */
 .home-featured-media {
   position: relative;
   width: 100%;
@@ -1509,12 +1511,17 @@ button:focus-visible {
   height: auto;
   min-height: 0;
   overflow: hidden;
+  padding: 0.35rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, var(--brand) 15%);
-  background: color-mix(in srgb, var(--bg-soft) 76%, var(--accent-playful) 24%);
+  background: color-mix(in srgb, var(--bg-soft) 84%, var(--accent) 16%);
+}
+
+.home-featured-media[data-product-category="handmade_crochet_knit"] {
+  aspect-ratio: 1 / 1;
 }
 
 .home-featured-media .home-featured-photo {
-  object-fit: cover;
+  object-fit: contain;
   object-position: center center;
 }
 
@@ -2210,6 +2217,7 @@ button:focus-visible {
 
   .home-featured-cta {
     width: 100%;
+    align-self: stretch;
   }
 
   .shop-studio-print-banner {
@@ -2983,8 +2991,9 @@ button:focus-visible {
 .home-closing-cta {
   text-align: center;
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
   justify-items: center;
+  padding: clamp(1rem, 2vw, 1.35rem);
   border-color: color-mix(in srgb, var(--brand) 18%, var(--border) 82%);
   background: linear-gradient(
     160deg,
@@ -3799,7 +3808,7 @@ button:focus-visible {
   padding: 0;
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
 }
 
 .product-card {
@@ -3884,6 +3893,7 @@ button:focus-visible {
   color: inherit;
   text-align: left;
   cursor: zoom-in;
+  touch-action: manipulation;
 }
 
 .product-card-image-trigger:focus-visible {
@@ -3891,7 +3901,7 @@ button:focus-visible {
   outline-offset: -2px;
 }
 
-/* Shop grid cards: crop to fill the frame (studio print + market gallery stay contain). */
+/* Shop grid cards: full product in frame (studio print + market gallery stay contain). */
 .product-card-media {
   position: relative;
   width: 100%;
@@ -3899,12 +3909,17 @@ button:focus-visible {
   height: auto;
   min-height: 0;
   overflow: hidden;
+  padding: 0.35rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, var(--brand) 12%);
-  background: color-mix(in srgb, var(--bg-soft) 76%, var(--accent-playful) 24%);
+  background: color-mix(in srgb, var(--bg-soft) 84%, var(--accent) 16%);
+}
+
+.product-card-media[data-product-category="handmade_crochet_knit"] {
+  aspect-ratio: 1 / 1;
 }
 
 .product-card-media .product-card-photo {
-  object-fit: cover;
+  object-fit: contain;
   object-position: center center;
 }
 
@@ -4851,7 +4866,8 @@ button:focus-visible {
   height: 96px;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: color-mix(in srgb, var(--bg-soft) 88%, var(--accent-playful) 12%);
+  padding: 0.28rem;
+  background: color-mix(in srgb, var(--bg-soft) 84%, var(--accent) 16%);
   border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 }
 
@@ -4865,7 +4881,8 @@ button:focus-visible {
 .cart-item-thumb-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center center;
 }
 
 .cart-item-thumb-placeholder {
@@ -5315,7 +5332,7 @@ button:focus-visible {
 
 .admin-subtle {
   margin: 0;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--muted) 68%, var(--brand-dark) 32%);
   font-size: 0.95rem;
 }
 
@@ -5335,7 +5352,7 @@ button:focus-visible {
 .admin-subnav-link {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0.35rem 0.85rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--border) 82%);
