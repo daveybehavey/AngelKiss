@@ -17,13 +17,22 @@
   --accent-playful: #5b4678;
   /* Readable ink on rose-tinted chips and pills */
   --accent-ink: #3d1526;
-  /* Header script wordmark — warm rose → coral on lavender header */
-  --brand-wordmark-from: #9a3d52;
-  --brand-wordmark-to: #c95a3a;
+  /* Header script wordmark — warm rose → coral on velvet header */
+  --brand-wordmark-from: #b85268;
+  --brand-wordmark-to: #dc6844;
   --surface-shadow: 0 14px 34px rgba(8, 4, 18, 0.28);
   --surface-shadow-soft: 0 12px 28px rgba(8, 4, 18, 0.18);
   --site-header-height: 72px;
   --site-header-content-gap: clamp(0.65rem, 1.5vw, 0.85rem);
+  /* Velvet header — richer purple (not near-black) */
+  --site-header-bg: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--brand) 58%, var(--bg) 42%) 68%,
+    var(--brand-dark) 32%
+  );
+  --site-header-border: color-mix(in srgb, var(--border) 55%, var(--brand-dark) 45%);
+  --site-header-ink: color-mix(in srgb, var(--bg-soft) 90%, white 10%);
+  --site-header-nav-ink: color-mix(in srgb, var(--bg-soft) 94%, white 6%);
   --panel-padding: clamp(0.9rem, 2.8vw, 1.15rem);
   --radius-lg: 18px;
   --radius-md: 14px;
@@ -212,15 +221,15 @@ button:focus-visible {
 }
 
 .site-header {
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--brand-dark) 30%);
-  background: color-mix(in srgb, var(--bg-soft) 76%, var(--brand-dark) 24%);
+  border-bottom: 1px solid var(--site-header-border);
+  background: var(--site-header-bg);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   position: fixed;
   inset: 0 0 auto 0;
   height: var(--site-header-height);
   z-index: 20;
-  box-shadow: 0 12px 28px rgba(8, 4, 18, 0.22);
+  box-shadow: 0 12px 28px rgba(8, 4, 18, 0.28);
 }
 
 .site-header-inner {
@@ -286,10 +295,19 @@ button:focus-visible {
   transition: background-color 180ms ease, color 180ms ease;
 }
 
+.site-header .site-nav a {
+  color: var(--site-header-nav-ink);
+}
+
 .site-nav a:hover {
   color: var(--brand-dark);
   text-decoration: none;
   background: color-mix(in srgb, var(--accent-playful) 22%, var(--bg-soft) 78%);
+}
+
+.site-header .site-nav a:hover {
+  color: var(--site-header-ink);
+  background: color-mix(in srgb, var(--accent-playful) 38%, var(--brand-dark) 62%);
 }
 
 .site-nav .site-nav-cart-link {
@@ -342,14 +360,18 @@ button:focus-visible {
   background: transparent;
   box-shadow: none;
   font-weight: 700;
-  color: var(--brand-dark);
+  color: var(--site-header-ink);
   transition: color 160ms ease, opacity 160ms ease;
 }
 
 .site-header-cart:hover {
-  color: color-mix(in srgb, var(--brand-dark) 82%, var(--accent) 18%);
+  color: color-mix(in srgb, var(--site-header-ink) 82%, var(--accent) 18%);
   background: transparent;
   box-shadow: none;
+}
+
+.site-header-cart .site-cart-count-badge {
+  box-shadow: 0 0 0 2px var(--site-header-bg);
 }
 
 .site-header-cart:active {
@@ -379,14 +401,14 @@ button:focus-visible {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: var(--brand-dark);
+  color: var(--site-header-ink);
   font-weight: 700;
   font-size: 0.9rem;
   transition: color 160ms ease, opacity 160ms ease;
 }
 
 .site-nav-menu-btn:hover {
-  color: color-mix(in srgb, var(--brand-dark) 82%, var(--accent) 18%);
+  color: color-mix(in srgb, var(--site-header-ink) 82%, var(--accent) 18%);
   background: transparent;
 }
 
