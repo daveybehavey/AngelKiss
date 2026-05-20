@@ -253,9 +253,8 @@ button:focus-visible {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 0 color-mix(in srgb, var(--brand-wordmark-from) 42%, transparent);
-  filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--brand-wordmark-from) 28%, transparent));
-  transition: opacity 200ms ease, filter 200ms ease;
+  text-shadow: none;
+  transition: opacity 200ms ease;
 }
 
 .brand-link:hover {
@@ -265,7 +264,7 @@ button:focus-visible {
     color-mix(in srgb, var(--brand-wordmark-from) 32%, var(--brand-wordmark-to) 68%) 50%,
     color-mix(in srgb, var(--brand-wordmark-to) 90%, var(--accent-warm) 10%) 100%
   );
-  filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--brand-wordmark-from) 34%, transparent));
+  text-shadow: none;
 }
 
 .site-nav {
@@ -2694,7 +2693,7 @@ button:focus-visible {
   gap: 0.65rem;
 }
 
-.studio-print-gallery-tile {
+.studio-print-gallery-card {
   display: grid;
   gap: 0.35rem;
   width: 100%;
@@ -2703,8 +2702,6 @@ button:focus-visible {
   border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
   background: #fff;
   text-align: left;
-  cursor: pointer;
-  text-decoration: none;
   color: inherit;
   transition:
     border-color 0.15s ease,
@@ -2712,19 +2709,55 @@ button:focus-visible {
     transform 0.15s ease;
 }
 
-.studio-print-gallery-tile:hover {
+.studio-print-gallery-card:hover {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border) 65%);
   box-shadow: var(--surface-shadow-soft);
 }
 
-.studio-print-gallery-tile:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 55%, white 45%);
-  outline-offset: 2px;
-}
-
-.studio-print-gallery-tile.is-selected {
+.studio-print-gallery-card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--brand) 45%);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.studio-print-gallery-image-trigger {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: zoom-in;
+  touch-action: manipulation;
+}
+
+.studio-print-gallery-image-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 72%, var(--accent) 28%);
+  outline-offset: -2px;
+}
+
+.studio-print-gallery-body-link,
+.studio-print-gallery-select-trigger {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.studio-print-gallery-body-link:focus-visible,
+.studio-print-gallery-select-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 55%, white 45%);
+  outline-offset: 2px;
 }
 
 .studio-print-gallery-thumb {
