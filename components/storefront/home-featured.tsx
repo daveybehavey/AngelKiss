@@ -90,6 +90,7 @@ export function HomeFeaturedProducts({ items }: Props) {
                           sizes="(max-width: 700px) 46vw, (max-width: 1100px) 31vw, 240px"
                           quality={72}
                           className="home-featured-photo"
+                          style={{ objectFit: "cover", objectPosition: "center" }}
                           loading={index < 2 ? "eager" : "lazy"}
                           priority={index === 0}
                           fetchPriority={index === 0 ? "high" : "low"}

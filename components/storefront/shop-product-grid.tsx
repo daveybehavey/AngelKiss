@@ -70,6 +70,7 @@ export function ShopProductGrid({ items }: Props) {
                       sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 256px"
                       quality={72}
                       className="product-card-photo"
+                      style={{ objectFit: "cover", objectPosition: "center" }}
                       loading={index < 2 ? "eager" : "lazy"}
                       priority={index === 0}
                       fetchPriority={index < 2 ? (index === 0 ? "high" : "low") : "low"}

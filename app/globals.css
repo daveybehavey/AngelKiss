@@ -1503,7 +1503,7 @@ button:focus-visible {
   outline-offset: -2px;
 }
 
-/* Featured product cards: full product in frame (contain). Studio / market galleries unchanged. */
+/* Featured product cards: match shop grid (4:5 cover). Studio / market galleries stay contain. */
 .home-featured-media {
   position: relative;
   width: 100%;
@@ -1511,17 +1511,12 @@ button:focus-visible {
   height: auto;
   min-height: 0;
   overflow: hidden;
-  padding: 0.35rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, var(--brand) 15%);
-  background: color-mix(in srgb, var(--bg-soft) 84%, var(--accent) 16%);
-}
-
-.home-featured-media[data-product-category="handmade_crochet_knit"] {
-  aspect-ratio: 1 / 1;
+  background: color-mix(in srgb, var(--bg-soft) 76%, var(--accent-playful) 24%);
 }
 
 .home-featured-media .home-featured-photo {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center center;
 }
 
@@ -3901,7 +3896,7 @@ button:focus-visible {
   outline-offset: -2px;
 }
 
-/* Shop grid cards: full product in frame (studio print + market gallery stay contain). */
+/* Shop grid cards: crop to fill the frame (studio print + market gallery stay contain). */
 .product-card-media {
   position: relative;
   width: 100%;
@@ -3909,17 +3904,12 @@ button:focus-visible {
   height: auto;
   min-height: 0;
   overflow: hidden;
-  padding: 0.35rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, var(--brand) 12%);
-  background: color-mix(in srgb, var(--bg-soft) 84%, var(--accent) 16%);
-}
-
-.product-card-media[data-product-category="handmade_crochet_knit"] {
-  aspect-ratio: 1 / 1;
+  background: color-mix(in srgb, var(--bg-soft) 76%, var(--accent-playful) 24%);
 }
 
 .product-card-media .product-card-photo {
-  object-fit: contain;
+  object-fit: cover;
   object-position: center center;
 }
 
