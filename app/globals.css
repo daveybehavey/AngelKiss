@@ -6978,14 +6978,14 @@ button:focus-visible {
     /* First screen below fixed header (home-main negates content-gap). */
     --home-hero-max-height: calc(100svh - var(--site-header-height));
     /* Logo art band — never collapse to 0 when copy fills the flex hero */
-    --home-hero-art-min: clamp(9.25rem, 36dvh, 12.75rem);
-    --home-hero-art-max: min(50dvh, calc(var(--home-hero-max-height) - 10.5rem));
+    --home-hero-art-min: min(42dvh, 280px);
+    --home-hero-art-max: min(52dvh, 320px);
   }
 
   @supports (height: 100dvh) {
     :root {
       --home-hero-max-height: calc(100dvh - var(--site-header-height));
-      --home-hero-art-max: min(50dvh, calc(var(--home-hero-max-height) - 10.5rem));
+      --home-hero-art-max: min(52dvh, 320px);
     }
   }
 
@@ -6995,7 +6995,8 @@ button:focus-visible {
 
   .home-hero {
     padding: 0;
-    max-height: var(--home-hero-max-height);
+    /* Prefer logo visibility over strict single-viewport cap */
+    max-height: none;
     display: flex;
     flex-direction: column;
     min-height: 0;
