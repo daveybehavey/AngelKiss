@@ -1,5 +1,9 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useCallback, useState } from "react";
+import { ImageLightbox } from "@/components/storefront/image-lightbox";
 import type { PublicProductSummary } from "@/lib/storefront/products";
 import {
   formatShopperProductTitle,
@@ -18,7 +22,16 @@ type Props = {
   items: PublicProductSummary[];
 };
 
+type LightboxState = {
+  src: string;
+  alt: string;
+  unoptimized: boolean;
+};
+
 export function HomeFeaturedProducts({ items }: Props) {
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+
   return (
     <section className="home-featured" aria-labelledby="home-featured-heading">
       <div className="home-featured-head">
@@ -45,33 +58,57 @@ export function HomeFeaturedProducts({ items }: Props) {
             {items.map((item, index) => {
               const displayName = formatShopperProductTitle(item.name);
               const primarySrc = getStorefrontGridImageUrl(item.primary_image_url);
+              const imageAlt = item.primary_image_alt ?? displayName;
+
               return (
                 <li
                   key={item.id}
                   className="home-featured-card"
                   style={{ transitionDelay: `${40 + index * 55}ms` }}
                 >
-                  <Link href={`/shop/${item.slug}`} className="home-featured-link" prefetch={false}>
-                    <div className="home-featured-media">
-                      {primarySrc ? (
+                  {primarySrc ? (
+                    <button
+                      type="button"
+                      className="home-featured-image-trigger"
+                      onClick={() =>
+                        setLightbox({
+                          src: primarySrc,
+                          alt: imageAlt,
+                          unoptimized: storefrontGridImageUnoptimized(primarySrc)
+                        })
+                      }
+                      aria-label={`View larger image of ${displayName}`}
+                    >
+                      <div className="home-featured-media">
                         <Image
                           src={primarySrc}
-                          alt={item.primary_image_alt ?? displayName}
+                          alt={imageAlt}
                           fill
                           sizes="(max-width: 700px) 46vw, (max-width: 1100px) 31vw, 240px"
                           quality={72}
                           className="home-featured-photo"
+                          style={{ objectFit: "cover", objectPosition: "center" }}
                           loading={index < 2 ? "eager" : "lazy"}
                           priority={index === 0}
                           fetchPriority={index === 0 ? "high" : "low"}
                           unoptimized={storefrontGridImageUnoptimized(primarySrc)}
                         />
-                      ) : (
-                        <div className="home-featured-placeholder">Photo soon</div>
-                      )}
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="home-featured-media">
+                      <div className="home-featured-placeholder">Photo soon</div>
                     </div>
+                  )}
+                  <Link
+                    href={`/shop/${item.slug}`}
+                    className="home-featured-body-link"
+                    prefetch={false}
+                  >
                     <div className="home-featured-body">
-                      <p className="home-featured-meta">{formatStorefrontCategory(item.category)}</p>
+                      <p className="home-featured-meta">
+                        {formatStorefrontCategory(item.category)}
+                      </p>
                       <h3>{displayName}</h3>
                       <p className="home-featured-price">
                         {formatMoney(item.base_price_cents, item.currency)}
@@ -84,6 +121,13 @@ export function HomeFeaturedProducts({ items }: Props) {
           </ul>
         </div>
       )}
+      <ImageLightbox
+        open={lightbox !== null}
+        onClose={closeLightbox}
+        src={lightbox?.src ?? ""}
+        alt={lightbox?.alt ?? ""}
+        unoptimized={lightbox?.unoptimized}
+      />
     </section>
   );
 }

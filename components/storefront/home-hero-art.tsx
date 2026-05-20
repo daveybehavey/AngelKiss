@@ -20,7 +20,7 @@ export function HomeHeroArt() {
           className="home-hero-art-native-img"
           src="/marketing/brand/hero-desktop.webp"
           srcSet="/marketing/brand/hero-desktop.webp 840w, /marketing/brand/hero-desktop@2x.webp 1680w"
-          sizes="(max-width: 700px) 100vw, (max-width: 980px) 58vw, min(52vw, 640px)"
+          sizes="(max-width: 980px) 100vw, min(52vw, 640px)"
           alt=""
           width={840}
           height={945}

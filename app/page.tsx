@@ -223,6 +223,17 @@ export default function HomePage() {
           </article>
 
           <article className="home-bento-card home-bento-card--small">
+            <div className="home-bento-card-media">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/marketing/home-gallery/stand-11.webp"
+                alt="Ready-made studio print designs on mugs and tumblers"
+                width={800}
+                height={600}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
             <div className="home-bento-card-body">
               <p className="card-kicker">Collection</p>
               <h2>Ready-made print designs</h2>
