@@ -332,28 +332,29 @@ button:focus-visible {
   position: relative;
   z-index: 32;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 44px;
   min-width: 44px;
   padding: 0.5rem;
-  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--border) 78%);
-  background: color-mix(in srgb, var(--accent-playful) 18%, var(--bg-soft) 82%);
-  font-weight: 800;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 700;
   color: var(--brand-dark);
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 160ms ease;
+  transition: color 160ms ease, opacity 160ms ease;
 }
 
 .site-header-cart:hover {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border) 65%);
-  background: color-mix(in srgb, var(--accent-playful) 26%, var(--bg-soft) 74%);
-  box-shadow: 0 8px 18px rgba(36, 27, 54, 0.12);
+  color: color-mix(in srgb, var(--brand-dark) 82%, var(--accent) 18%);
+  background: transparent;
+  box-shadow: none;
 }
 
 .site-header-cart:active {
-  transform: scale(0.97);
+  opacity: 0.88;
 }
 
 .site-header-cart .site-nav-cart-icon {
@@ -373,13 +374,21 @@ button:focus-visible {
   justify-content: center;
   gap: 0.4rem;
   min-height: 44px;
-  padding: 0.45rem 0.72rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--border) 82%);
-  background: color-mix(in srgb, var(--bg-soft) 92%, white 8%);
+  min-width: 44px;
+  padding: 0.5rem 0.55rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--brand-dark);
   font-weight: 700;
   font-size: 0.9rem;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.site-nav-menu-btn:hover {
+  color: color-mix(in srgb, var(--brand-dark) 82%, var(--accent) 18%);
+  background: transparent;
 }
 
 .site-nav-menu-btn::-webkit-details-marker {
@@ -559,9 +568,8 @@ button:focus-visible {
   }
 
   .site-nav-drawer[open] .site-nav-menu-btn {
-    color: #fff;
-    border-color: color-mix(in srgb, var(--brand) 55%, var(--brand-dark) 45%);
-    background: linear-gradient(120deg, var(--brand-dark) 0%, var(--brand) 100%);
+    color: var(--brand-dark);
+    background: transparent;
   }
 
   .site-nav-drawer[open] .site-nav-menu-icon span:nth-child(1) {
@@ -603,8 +611,6 @@ button:focus-visible {
   }
 
   .site-header-cart {
-    border-color: color-mix(in srgb, var(--brand) 14%, var(--border) 86%);
-    background: transparent;
     font-weight: 700;
   }
 
