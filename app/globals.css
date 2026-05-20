@@ -6977,15 +6977,14 @@ button:focus-visible {
     --site-header-height: calc(58px + env(safe-area-inset-top, 0px));
     /* First screen below fixed header (home-main negates content-gap). */
     --home-hero-max-height: calc(100svh - var(--site-header-height));
-    /* Logo art band — never collapse to 0 when copy fills the flex hero */
-    --home-hero-art-min: min(42dvh, 280px);
-    --home-hero-art-max: min(52dvh, 320px);
+    /* Logo art band — maximize within viewport minus copy/CTA (~12rem). */
+    --home-hero-art-min: min(72svh, calc(100svh - var(--site-header-height) - 12rem));
   }
 
   @supports (height: 100dvh) {
     :root {
       --home-hero-max-height: calc(100dvh - var(--site-header-height));
-      --home-hero-art-max: min(52dvh, 320px);
+      --home-hero-art-min: min(72dvh, calc(100dvh - var(--site-header-height) - 12rem));
     }
   }
 
@@ -6995,11 +6994,9 @@ button:focus-visible {
 
   .home-hero {
     padding: 0;
-    /* Prefer logo visibility over strict single-viewport cap */
-    max-height: none;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: var(--home-hero-max-height);
   }
 
   .home-hero-shell {
@@ -7007,7 +7004,6 @@ button:focus-visible {
     width: 100%;
     flex: 1 1 auto;
     min-height: 0;
-    max-height: 100%;
     display: flex;
     flex-direction: column;
     align-content: stretch;
@@ -7017,7 +7013,6 @@ button:focus-visible {
     flex: 1 1 auto;
     width: 100%;
     min-height: var(--home-hero-art-min);
-    max-height: var(--home-hero-art-max);
     aspect-ratio: unset;
     border-radius: 0;
     box-shadow: none;
