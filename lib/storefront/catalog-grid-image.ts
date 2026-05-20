@@ -122,3 +122,32 @@ export function catalogGridCdnUrlFromMasterUrl(masterUrl: string): string | null
   }
   return buildCdnObjectUrl(gridKey);
 }
+
+/** `products/foo_grid.webp` → `products/foo.webp` */
+export function catalogMasterObjectKeyFromGridObjectKey(gridObjectKey: string): string | null {
+  const key = String(gridObjectKey ?? "")
+    .trim()
+    .replace(/^\/+/, "");
+  if (!isCatalogGridObjectKey(key)) {
+    return null;
+  }
+  return key.replace(/_grid\.webp$/i, ".webp");
+}
+
+/**
+ * Public CDN URL for the master when given a `_grid.webp` CDN URL (or null if not a grid URL).
+ */
+export function catalogMasterCdnUrlFromGridCdnUrl(gridUrl: string): string | null {
+  if (!isStorefrontCdnImageSrc(gridUrl)) {
+    return null;
+  }
+  const objectKey = catalogObjectKeyFromCdnUrl(gridUrl);
+  if (!objectKey) {
+    return null;
+  }
+  const masterKey = catalogMasterObjectKeyFromGridObjectKey(objectKey);
+  if (!masterKey) {
+    return null;
+  }
+  return buildCdnObjectUrl(masterKey);
+}

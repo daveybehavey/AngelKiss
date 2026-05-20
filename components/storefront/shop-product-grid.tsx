@@ -14,6 +14,7 @@ import {
 } from "@/lib/storefront/product-display";
 import {
   getStorefrontGridImageUrl,
+  getStorefrontLightboxImageUrl,
   storefrontGridImageUnoptimized
 } from "@/lib/storefront/storefront-image-src";
 import type { PublicProductSummary } from "@/lib/storefront/products";
@@ -41,20 +42,22 @@ export function ShopProductGrid({ items }: Props) {
       <ul className="product-grid shop-product-grid product-grid-entrance">
         {items.map((item, index) => {
           const displayName = formatShopperProductTitle(item.name);
-          const primarySrc = getStorefrontGridImageUrl(item.primary_image_url);
+          const thumbSrc = getStorefrontGridImageUrl(item.primary_image_url);
+          const lightboxSrc = getStorefrontLightboxImageUrl(item.primary_image_url);
           const imageAlt = item.primary_image_alt ?? displayName;
 
           return (
             <li key={item.id} className="product-card product-card-shine">
-              {primarySrc ? (
+              {thumbSrc ? (
                 <button
                   type="button"
                   className="product-card-image-trigger"
                   onClick={() =>
+                    lightboxSrc &&
                     setLightbox({
-                      src: primarySrc,
+                      src: lightboxSrc,
                       alt: imageAlt,
-                      unoptimized: storefrontGridImageUnoptimized(primarySrc)
+                      unoptimized: storefrontGridImageUnoptimized(lightboxSrc)
                     })
                   }
                   aria-label={`View larger image of ${displayName}`}
@@ -64,7 +67,7 @@ export function ShopProductGrid({ items }: Props) {
                     data-product-category={item.category}
                   >
                     <Image
-                      src={primarySrc}
+                      src={thumbSrc}
                       alt={imageAlt}
                       fill
                       sizes="(max-width: 700px) 50vw, (max-width: 1100px) 33vw, 256px"
@@ -74,7 +77,7 @@ export function ShopProductGrid({ items }: Props) {
                       loading={index < 2 ? "eager" : "lazy"}
                       priority={index === 0}
                       fetchPriority={index < 2 ? (index === 0 ? "high" : "low") : "low"}
-                      unoptimized={storefrontGridImageUnoptimized(primarySrc)}
+                      unoptimized={storefrontGridImageUnoptimized(thumbSrc)}
                     />
                   </div>
                 </button>

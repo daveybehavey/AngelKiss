@@ -1,5 +1,6 @@
 import {
   catalogGridCdnUrlFromMasterUrl,
+  catalogMasterCdnUrlFromGridCdnUrl,
   isStorefrontR2GridVariantsEnabled
 } from "@/lib/storefront/catalog-grid-image";
 import {
@@ -16,6 +17,9 @@ export const STOREFRONT_THUMB_IMAGE_WIDTH = 200;
 
 /** Home studio-print carousel (larger hero, still below full 1600px masters). */
 export const STOREFRONT_HOME_STUDIO_IMAGE_WIDTH = 640;
+
+/** Lightbox / zoom preview — full master or high-quality static resize. */
+export const STOREFRONT_LIGHTBOX_IMAGE_WIDTH = 1600;
 
 /**
  * Values safe to pass to `next/image` `src` (absolute URL or root-relative path).
@@ -112,4 +116,62 @@ export function storefrontGridImageUnoptimized(src: string): boolean {
     return true;
   }
   return storefrontImageUnoptimized(src);
+}
+
+/** Strip `/cdn-cgi/image/.../` wrapper; returns absolute URL or root-relative path. */
+export function unwrapStorefrontCfImageResizeUrl(url: string): string | null {
+  const idx = url.indexOf("/cdn-cgi/image/");
+  if (idx === -1) {
+    return null;
+  }
+  const afterPrefix = url.slice(idx + "/cdn-cgi/image/".length);
+  const slash = afterPrefix.indexOf("/");
+  if (slash === -1) {
+    return null;
+  }
+  const target = afterPrefix.slice(slash + 1);
+  if (!target) {
+    return null;
+  }
+  if (target.startsWith("http://") || target.startsWith("https://")) {
+    return target;
+  }
+  return target.startsWith("/") ? target : `/${target}`;
+}
+
+/**
+ * Full-quality URL for lightbox / zoom (not grid thumbs).
+ * R2: master catalog URL (never `_grid.webp`). Static marketing: unwrap or resize up to ~1600px.
+ */
+export function getStorefrontLightboxImageUrl(
+  url: string | null | undefined,
+  options?: { width?: number; quality?: number }
+): string | null {
+  let resolved = storefrontImageSrcOrNull(url);
+  if (!resolved) {
+    return null;
+  }
+
+  const fromGrid = catalogMasterCdnUrlFromGridCdnUrl(resolved);
+  if (fromGrid) {
+    resolved = fromGrid;
+  }
+
+  const unwrapped = unwrapStorefrontCfImageResizeUrl(resolved);
+  if (unwrapped) {
+    resolved = storefrontImageSrcOrNull(unwrapped) ?? unwrapped;
+  }
+
+  if (isStorefrontCdnImageSrc(resolved)) {
+    return resolved;
+  }
+
+  if (resolved.startsWith("/") && isStorefrontCfImageResizeEnabled()) {
+    return buildCfImageResizeUrl(resolved, {
+      width: options?.width ?? STOREFRONT_LIGHTBOX_IMAGE_WIDTH,
+      quality: options?.quality ?? 90
+    });
+  }
+
+  return resolved;
 }

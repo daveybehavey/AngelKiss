@@ -11,6 +11,7 @@ import {
 } from "@/lib/storefront/product-display";
 import {
   getStorefrontGridImageUrl,
+  getStorefrontLightboxImageUrl,
   storefrontGridImageUnoptimized
 } from "@/lib/storefront/storefront-image-src";
 
@@ -57,7 +58,8 @@ export function HomeFeaturedProducts({ items }: Props) {
           <ul className="home-featured-grid">
             {items.map((item, index) => {
               const displayName = formatShopperProductTitle(item.name);
-              const primarySrc = getStorefrontGridImageUrl(item.primary_image_url);
+              const thumbSrc = getStorefrontGridImageUrl(item.primary_image_url);
+              const lightboxSrc = getStorefrontLightboxImageUrl(item.primary_image_url);
               const imageAlt = item.primary_image_alt ?? displayName;
 
               return (
@@ -66,15 +68,16 @@ export function HomeFeaturedProducts({ items }: Props) {
                   className="home-featured-card"
                   style={{ transitionDelay: `${40 + index * 55}ms` }}
                 >
-                  {primarySrc ? (
+                  {thumbSrc ? (
                     <button
                       type="button"
                       className="home-featured-image-trigger"
                       onClick={() =>
+                        lightboxSrc &&
                         setLightbox({
-                          src: primarySrc,
+                          src: lightboxSrc,
                           alt: imageAlt,
-                          unoptimized: storefrontGridImageUnoptimized(primarySrc)
+                          unoptimized: storefrontGridImageUnoptimized(lightboxSrc)
                         })
                       }
                       aria-label={`View larger image of ${displayName}`}
@@ -84,7 +87,7 @@ export function HomeFeaturedProducts({ items }: Props) {
                         data-product-category={item.category}
                       >
                         <Image
-                          src={primarySrc}
+                          src={thumbSrc}
                           alt={imageAlt}
                           fill
                           sizes="(max-width: 700px) 46vw, (max-width: 1100px) 31vw, 240px"
@@ -94,7 +97,7 @@ export function HomeFeaturedProducts({ items }: Props) {
                           loading={index < 2 ? "eager" : "lazy"}
                           priority={index === 0}
                           fetchPriority={index === 0 ? "high" : "low"}
-                          unoptimized={storefrontGridImageUnoptimized(primarySrc)}
+                          unoptimized={storefrontGridImageUnoptimized(thumbSrc)}
                         />
                       </div>
                     </button>

@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   catalogGridCdnUrlFromMasterUrl,
   catalogGridObjectKey,
+  catalogMasterCdnUrlFromGridCdnUrl,
+  catalogMasterObjectKeyFromGridObjectKey,
   catalogObjectKeyFromCdnUrl,
   isStorefrontR2GridVariantsEnabled
 } from "../lib/storefront/catalog-grid-image";
@@ -16,6 +18,13 @@ describe("catalogGridObjectKey", () => {
   it("skips templates and existing grid keys", () => {
     assert.equal(catalogGridObjectKey("templates/foo.webp"), null);
     assert.equal(catalogGridObjectKey("products/foo_grid.webp"), null);
+  });
+
+  it("reverses grid keys to masters", () => {
+    assert.equal(
+      catalogMasterObjectKeyFromGridObjectKey("products/foo_grid.webp"),
+      "products/foo.webp"
+    );
   });
 });
 
@@ -42,6 +51,19 @@ describe("catalogGridCdnUrlFromMasterUrl", () => {
     process.env[cdnKey] = "https://pub-abc.r2.dev";
     try {
       assert.equal(catalogGridCdnUrlFromMasterUrl("https://other.example/x.webp"), null);
+    } finally {
+      restoreEnv(cdnKey, prev);
+    }
+  });
+
+  it("builds master CDN URL from grid CDN URL", () => {
+    const prev = process.env[cdnKey];
+    process.env[cdnKey] = "https://pub-abc.r2.dev";
+    try {
+      assert.equal(
+        catalogMasterCdnUrlFromGridCdnUrl("https://pub-abc.r2.dev/products/mug_grid.webp"),
+        "https://pub-abc.r2.dev/products/mug.webp"
+      );
     } finally {
       restoreEnv(cdnKey, prev);
     }

@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   getStorefrontGridImageUrl,
+  getStorefrontLightboxImageUrl,
   isStorefrontCdnImageSrc,
   isStorefrontCfImageResizeEnabled,
   storefrontGridImageUnoptimized,
   storefrontImageSrcOrNull,
-  storefrontImageUnoptimized
+  storefrontImageUnoptimized,
+  unwrapStorefrontCfImageResizeUrl
 } from "../lib/storefront/storefront-image-src";
 
 describe("storefrontImageSrcOrNull", () => {
@@ -151,6 +153,55 @@ describe("getStorefrontGridImageUrl", () => {
       const src = "https://pub-abc.r2.dev/x.webp";
       assert.equal(getStorefrontGridImageUrl(src), src);
     } finally {
+      restoreEnv(resizeKey, prevResize);
+    }
+  });
+});
+
+describe("unwrapStorefrontCfImageResizeUrl", () => {
+  it("unwraps same-origin cdn-cgi paths", () => {
+    const wrapped =
+      "https://anglkisscreations.ca/cdn-cgi/image/width=384,quality=75,format=auto/marketing/stand-01.webp";
+    assert.equal(unwrapStorefrontCfImageResizeUrl(wrapped), "/marketing/stand-01.webp");
+  });
+});
+
+describe("getStorefrontLightboxImageUrl", () => {
+  const cdnKey = "NEXT_PUBLIC_IMAGE_CDN_BASE_URL";
+  const siteKey = "NEXT_PUBLIC_SITE_URL";
+  const resizeKey = "NEXT_PUBLIC_STOREFRONT_CF_IMAGE_RESIZE";
+
+  it("returns R2 master, not _grid.webp", () => {
+    const prevCdn = process.env[cdnKey];
+    const prevGrid = process.env["NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS"];
+    process.env[cdnKey] = "https://pub-abc.r2.dev";
+    process.env["NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS"] = "1";
+    try {
+      const master = "https://pub-abc.r2.dev/products/mug.webp";
+      assert.equal(getStorefrontLightboxImageUrl(master), master);
+      assert.equal(
+        getStorefrontLightboxImageUrl("https://pub-abc.r2.dev/products/mug_grid.webp"),
+        master
+      );
+    } finally {
+      restoreEnv(cdnKey, prevCdn);
+      restoreEnv("NEXT_PUBLIC_STOREFRONT_R2_GRID_VARIANTS", prevGrid);
+    }
+  });
+
+  it("upgrades marketing paths to high-quality cdn-cgi when resize is on", () => {
+    const prevSite = process.env[siteKey];
+    const prevResize = process.env[resizeKey];
+    process.env[siteKey] = "https://anglkisscreations.ca";
+    process.env[resizeKey] = "1";
+    try {
+      const out = getStorefrontLightboxImageUrl("/marketing/home-gallery/stand-01.webp");
+      assert.equal(
+        out,
+        "https://anglkisscreations.ca/cdn-cgi/image/width=1600,quality=90,format=auto/marketing/home-gallery/stand-01.webp"
+      );
+    } finally {
+      restoreEnv(siteKey, prevSite);
       restoreEnv(resizeKey, prevResize);
     }
   });

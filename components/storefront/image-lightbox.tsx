@@ -90,7 +90,8 @@ export function ImageLightbox({ open, onClose, src, alt, unoptimized }: ImageLig
               src={src}
               alt={alt}
               fill
-              sizes="(max-width: 900px) 92vw, min(720px, 88vw)"
+              sizes="(max-width: 900px) 96vw, min(1600px, 94vw)"
+              quality={90}
               className="image-lightbox-img"
               style={{ objectFit: "contain" }}
               unoptimized={unoptimized}
