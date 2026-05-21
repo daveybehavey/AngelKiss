@@ -2759,9 +2759,22 @@ button:focus-visible {
   color: var(--brand-dark);
 }
 
+.gallery-empty-panel {
+  text-align: center;
+  padding: 1.5rem 1.25rem;
+}
+
 .gallery-empty-note {
-  margin: 0.5rem 0 0;
+  margin: 0;
+  font-weight: 600;
+  color: var(--brand-dark);
+}
+
+.gallery-empty-hint {
+  margin: 0.5rem 0 1rem;
   color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .studio-print-gallery-grid {

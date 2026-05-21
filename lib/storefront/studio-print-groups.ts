@@ -101,6 +101,26 @@ export async function listStudioPrintGroupsAdmin(
   }));
 }
 
+/** Count group members that appear in the active prints list (storefront gallery). */
+export function countActivePrintsInGroup<T extends { id: string }>(
+  prints: T[],
+  group: PublicStudioPrintGroup
+): number {
+  if (group.print_ids.length === 0) {
+    return 0;
+  }
+  const activeIds = new Set(prints.map((p) => p.id));
+  return group.print_ids.filter((id) => activeIds.has(id)).length;
+}
+
+/** Theme groups that have at least one active print — for storefront chips. */
+export function groupsWithActivePrints<T extends { id: string }>(
+  prints: T[],
+  groups: PublicStudioPrintGroup[]
+): PublicStudioPrintGroup[] {
+  return groups.filter((group) => countActivePrintsInGroup(prints, group) > 0);
+}
+
 export function filterPrintsByGroupSlug<T extends { id: string }>(
   prints: T[],
   groups: PublicStudioPrintGroup[],
@@ -111,7 +131,7 @@ export function filterPrintsByGroupSlug<T extends { id: string }>(
     return prints;
   }
   const group = groups.find((g) => g.slug === slug);
-  if (!group || group.print_ids.length === 0) {
+  if (!group || countActivePrintsInGroup(prints, group) === 0) {
     return [];
   }
   const allowed = new Set(group.print_ids);

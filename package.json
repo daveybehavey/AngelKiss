@@ -10,6 +10,8 @@
     "admin:import-folder": "node scripts/import-products-from-folder.mjs",
     "admin:import-studio-prints": "node scripts/import-studio-prints-from-folder.mjs",
     "admin:repair-studio-print-titles": "node scripts/repair-studio-print-titles.mjs",
+    "admin:apply-gallery-catalog": "node scripts/apply-gallery-catalog.mjs",
+    "admin:normalize-gallery-catalog-md": "node scripts/normalize-gallery-catalog-md.mjs",
     "admin:dedupe-studio-prints-trailing": "node scripts/dedupe-studio-prints-trailing-copy.mjs",
     "admin:backfill-studio-print-dims": "node scripts/backfill-studio-print-dimensions.mjs",
     "admin:release-stuck-inventory": "node scripts/release-stuck-inventory.mjs",

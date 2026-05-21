@@ -36,6 +36,7 @@ const cwd = process.cwd();
 const expected = readStorefrontRevalidateSecondsFromEnv(cwd);
 const routes = [
   resolve(cwd, "app", "page.tsx"),
+  resolve(cwd, "app", "gallery", "page.tsx"),
   resolve(cwd, "app", "shop", "page.tsx"),
   resolve(cwd, "app", "shop", "[slug]", "page.tsx")
 ];

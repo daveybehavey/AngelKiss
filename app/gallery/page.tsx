@@ -17,11 +17,33 @@ const GalleryPrintsClient = dynamic(
 
 export const revalidate = 1800;
 
+const galleryOgImage = {
+  url: "/marketing/home-gallery/stand-12.webp",
+  width: 1200,
+  height: 630,
+  alt: "AnglKiss Creations studio print designs on custom drinkware"
+} as const;
+
 export const metadata: Metadata = {
   title: "Studio print gallery",
   description:
     "Browse original in-house print designs for mugs, tumblers, bags, and more at AnglKiss Creations.",
-  alternates: { canonical: "/gallery" }
+  alternates: { canonical: "/gallery" },
+  openGraph: {
+    title: "Studio print gallery | AnglKiss Creations",
+    description:
+      "Browse original in-house print designs for mugs, tumblers, bags, and more at AnglKiss Creations.",
+    type: "website",
+    url: "/gallery",
+    images: [galleryOgImage]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Studio print gallery | AnglKiss Creations",
+    description:
+      "Browse original in-house print designs for mugs, tumblers, bags, and more at AnglKiss Creations.",
+    images: [galleryOgImage.url]
+  }
 };
 
 export default async function GalleryPage() {

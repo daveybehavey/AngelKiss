@@ -4,14 +4,18 @@ import { StudioPrintGalleryGrid } from "@/components/storefront/studio-print-gal
 import { filterStudioPrintsBySearch } from "@/lib/storefront/filter-studio-prints";
 import { sortStudioPrintsWithSelectedFirst } from "@/lib/storefront/sort-studio-prints";
 import {
+  countActivePrintsInGroup,
   filterPrintsByGroupSlug,
+  groupsWithActivePrints,
   type PublicStudioPrintGroup
 } from "@/lib/storefront/studio-print-groups";
 import type { PublicStudioPrint } from "@/lib/storefront/studio-prints";
 import { shopHrefForStudioPrint } from "@/lib/storefront/studio-print-client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 type GalleryPrintsClientProps = {
   prints: PublicStudioPrint[];
@@ -26,10 +30,24 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
   const queryFromUrl = searchParams.get("q") ?? "";
 
   const [searchInput, setSearchInput] = useState(queryFromUrl);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setSearchInput(queryFromUrl);
   }, [queryFromUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
+  const themeGroups = useMemo(
+    () => groupsWithActivePrints(prints, groups),
+    [prints, groups]
+  );
 
   const byTheme = useMemo(
     () => filterPrintsByGroupSlug(prints, groups, groupSlug),
@@ -78,6 +96,13 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
     });
   }
 
+  function cancelSearchDebounce() {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+  }
+
   function commitSearch(value: string) {
     const trimmed = value.trim();
     pushParams((params) => {
@@ -89,7 +114,21 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
     });
   }
 
+  function commitSearchNow(value: string) {
+    cancelSearchDebounce();
+    commitSearch(value);
+  }
+
+  function scheduleSearchDebounced(value: string) {
+    cancelSearchDebounce();
+    searchDebounceRef.current = setTimeout(() => {
+      searchDebounceRef.current = null;
+      commitSearch(value);
+    }, SEARCH_DEBOUNCE_MS);
+  }
+
   function clearFilters() {
+    cancelSearchDebounce();
     setSearchInput("");
     pushParams((params) => {
       params.delete("group");
@@ -127,21 +166,22 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
               All prints
               <span className="gallery-filter-chip-count">{prints.length}</span>
             </button>
-            {groups.map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                className={`gallery-filter-chip ${groupSlug === group.slug ? "is-active" : ""}`}
-                onClick={() => setGroup(group.slug)}
-              >
-                {group.name}
-                {group.print_ids.length > 0 ? (
-                  <span className="gallery-filter-chip-count">{group.print_ids.length}</span>
-                ) : null}
-              </button>
-            ))}
+            {themeGroups.map((group) => {
+              const activeCount = countActivePrintsInGroup(prints, group);
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  className={`gallery-filter-chip ${groupSlug === group.slug ? "is-active" : ""}`}
+                  onClick={() => setGroup(group.slug)}
+                >
+                  {group.name}
+                  <span className="gallery-filter-chip-count">{activeCount}</span>
+                </button>
+              );
+            })}
           </div>
-          {groups.length === 0 ? (
+          {themeGroups.length === 0 ? (
             <p className="gallery-themes-empty">
               More themes coming soon — browse all designs below for now.
             </p>
@@ -157,13 +197,17 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
               id="gallery-search-input"
               type="search"
               className="gallery-search-input"
-              placeholder="Try floral, mug, mom, coastal…"
+              placeholder="Try floral, ocean, flower, fantasy…"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchInput(value);
+                scheduleSearchDebounced(value);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  commitSearch(searchInput);
+                  commitSearchNow(searchInput);
                 }
               }}
               autoComplete="off"
@@ -172,7 +216,7 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
             <button
               type="button"
               className="btn btn-primary gallery-search-btn"
-              onClick={() => commitSearch(searchInput)}
+              onClick={() => commitSearchNow(searchInput)}
             >
               Search
             </button>
@@ -222,7 +266,27 @@ export function GalleryPrintsClient({ prints, groups }: GalleryPrintsClientProps
       ) : null}
 
       <section className="gallery-grid-section" aria-label="Studio print designs">
-        <StudioPrintGalleryGrid prints={sorted} selectedPrintId={selectedId} linkToShop />
+        {sorted.length === 0 && prints.length > 0 ? (
+          <div className="gallery-empty-panel panel">
+            <p className="gallery-empty-note">No prints match your filters.</p>
+            <p className="gallery-empty-hint">
+              {queryFromUrl.trim() && activeTheme
+                ? "Try clearing search or picking another theme."
+                : queryFromUrl.trim()
+                  ? "Try a shorter search or clear it to see everything."
+                  : activeTheme
+                    ? "This theme has no active designs right now — browse all prints or try another theme."
+                    : "Clear your filters to see the full gallery."}
+            </p>
+            {hasActiveFilters ? (
+              <button type="button" className="btn btn-outline btn-sm" onClick={clearFilters}>
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <StudioPrintGalleryGrid prints={sorted} selectedPrintId={selectedId} linkToShop />
+        )}
       </section>
     </>
   );
