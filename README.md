@@ -65,23 +65,67 @@ npm run audit:storefront
 
 ## Application Surfaces
 
-Customer-facing routes include the storefront, cart, checkout, product pages, and newsletter flow. Administrative routes support product creation/editing, publishing, inventory, images, orders, and shipping settings.
+Customer-facing routes include the storefront, cart, checkout, product pages, gallery, and newsletter flow. Administrative routes support product creation/editing, publishing, inventory, images, orders, and shipping settings.
 
 The backend exposes APIs for product data, admin operations, checkout sessions, PayPal order lifecycle actions, webhook processing, newsletter subscriptions, and order management.
 
 ## Local Development
 
+Prerequisites: Node.js 20+, a Supabase project, and PayPal sandbox credentials.
+
 ```bash
-npm install
 npm run setup
+```
+
+`npm run setup` installs dependencies, creates `.env.local` from `.env.example` when needed, and validates required environment variables. Fill in the values documented in `.env.example`, including the public Supabase values, server-side Supabase key, PayPal credentials, and site URL.
+
+Before starting with a fresh Supabase project, set `SUPABASE_DB_PASSWORD` in `.env.local` and apply the repository migrations:
+
+```bash
+npm run db:push
+```
+
+Migration files live under `supabase/migrations/`. You can inspect local-versus-remote migration state with:
+
+```bash
+npm run db:migrations
+```
+
+Then start the application:
+
+```bash
 npm run dev
 ```
 
-Environment requirements are documented in `.env.example`. Database migrations live under `supabase/migrations/`.
+### First Admin Bootstrap
+
+A new environment also needs an initial administrator. Create the user first in **Supabase Dashboard → Authentication → Users**, then run the following in the Supabase SQL Editor, replacing the email address with the administrator's email:
+
+```sql
+insert into public.user_profiles (id, role, full_name)
+select id, 'admin', 'Store Admin'
+from auth.users
+where email = 'your-admin-email@example.com'
+on conflict (id) do update
+set role = excluded.role;
+```
+
+Without the corresponding `user_profiles` row with role `admin`, authenticated users are not granted access to the administrative workflows.
 
 ## Deployment
 
 The application is configured for Cloudflare Workers through OpenNext. Production deploys use the repository's validation and deployment tooling rather than treating deployment itself as the test step.
+
+```bash
+npm run cf:preflight
+npm run deploy
+```
+
+The canonical production deployment can also be run through the repository's `.ca` deployment path, which validates environment configuration before building and shipping:
+
+```bash
+npm run deploy:ca
+```
 
 **Live:** https://anglkisscreations.ca
 
