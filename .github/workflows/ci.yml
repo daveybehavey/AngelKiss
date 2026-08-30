@@ -30,4 +30,12 @@ jobs:
         run: npm run test
 
       - name: Build
+        env:
+          # Public, non-production placeholders used only so Next.js can prerender
+          # client surfaces that require NEXT_PUBLIC_* configuration during CI.
+          # Real deployment values remain outside the repository.
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_SITE_URL: https://example.invalid
+          NEXT_PUBLIC_PAYPAL_CLIENT_ID: ci-placeholder-paypal-client-id
         run: npm run build
