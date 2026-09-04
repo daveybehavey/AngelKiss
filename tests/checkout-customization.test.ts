@@ -5,6 +5,7 @@ import {
   type CheckoutProductRow,
   type CustomSublimationCheckoutDetails
 } from "../lib/checkout/customization";
+import { getCustomerUploadsBucket } from "../lib/admin/images";
 
 const handmadeProduct: CheckoutProductRow = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -106,7 +107,7 @@ test("custom upload product accepts valid payload", () => {
   const result = normalizeCustomizationForCheckout(
     {
       upload: {
-        bucket: "customer-design-uploads",
+        bucket: getCustomerUploadsBucket(),
         storage_path: `customizations/${uploadProduct.id}/photo.png`,
         original_filename: "photo.png",
         content_type: "image/png",
@@ -154,7 +155,7 @@ test("ready-made sublimation rejects upload payload", () => {
   const result = normalizeCustomizationForCheckout(
     {
       upload: {
-        bucket: "customer-design-uploads",
+        bucket: getCustomerUploadsBucket(),
         storage_path: `customizations/${readyMadeProduct.id}/photo.png`
       },
       rights_acknowledged: true
