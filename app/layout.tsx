@@ -239,6 +239,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </div>
               <div className="site-wrap site-footer-bottom">
                 <p>&copy; {new Date().getFullYear()} AnglKiss Creations. All rights reserved.</p>
+                <p>
+                  <a
+                    href="https://eurodigital.ca/projects"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Website by EuroDigital
+                  </a>
+                </p>
               </div>
             </footer>
           </div>
