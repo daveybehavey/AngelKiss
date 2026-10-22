@@ -196,7 +196,23 @@ BEGIN
     RETURN;
   END IF;
 
-  v_captured_cents := round(v_captured_value::numeric * 100)::integer;
+  -- The captured amount must resolve to an exact whole number of cents.
+  -- A fractional-cent value (e.g. 49.999) fails verification outright;
+  -- rounding it could turn a non-matching capture into an apparent match.
+  IF v_captured_value::numeric * 100 <> trunc(v_captured_value::numeric * 100) THEN
+    UPDATE public.paypal_webhook_events
+    SET processing_error = concat('Captured amount is not an exact number of cents: ', v_captured_value)
+    WHERE id = v_webhook_row_id;
+
+    processed := false;
+    duplicate := false;
+    order_id := NULL;
+    message := 'Captured amount unverifiable';
+    RETURN NEXT;
+    RETURN;
+  END IF;
+
+  v_captured_cents := (v_captured_value::numeric * 100)::integer;
 
   -- The session's expected currency is the one recorded in its item
   -- snapshots at creation time. If the items do not agree on exactly one
