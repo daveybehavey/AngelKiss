@@ -175,6 +175,13 @@ async function paypalRequest<TResponse>(
   options: {
     method: "POST" | "GET";
     body?: Record<string, unknown>;
+    /**
+     * Ask PayPal for the full representation of the resource. Without this
+     * PayPal answers with a minimal representation (id, status, links),
+     * which for a capture omits `purchase_units[].payments.captures[]` —
+     * the very payload the capture route verifies the payment from.
+     */
+    preferRepresentation?: boolean;
   }
 ): Promise<TResponse> {
   const token = await getAccessToken();
@@ -182,7 +189,8 @@ async function paypalRequest<TResponse>(
     method: options.method,
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(options.preferRepresentation ? { Prefer: "return=representation" } : {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
@@ -223,7 +231,10 @@ export async function createPayPalOrder(input: {
 
 export async function capturePayPalOrder(orderId: string): Promise<PayPalOrderCaptureResponse> {
   return paypalRequest<PayPalOrderCaptureResponse>(`/v2/checkout/orders/${orderId}/capture`, {
-    method: "POST"
+    method: "POST",
+    // The caller verifies status, capture id, amount, and currency from the
+    // captures payload, so the minimal default representation is not enough.
+    preferRepresentation: true
   });
 }
 
