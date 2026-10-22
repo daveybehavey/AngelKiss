@@ -28,13 +28,25 @@ declare
   v_payment record;
 begin
   -- Seed: one made-to-order product priced CAD 50.00 and a checkout session
-  -- whose PayPal order exists but has not been captured.
+  -- whose PayPal order exists but has not been captured. Every seeded
+  -- session carries a valid synthetic CA/BC/Victoria shipping address:
+  -- the totals trigger recalculates shipping from the address on every
+  -- item insert and raises when no destination country is present.
   insert into public.products (slug, name, category, base_price_cents, currency, inventory_mode, status, is_available)
   values ('verify-paypal-finalization', 'Verify PayPal Finalization', 'custom_sublimation', 5000, 'CAD', 'made_to_order', 'published', true)
   returning id into v_product_id;
 
+  -- Pin shipping deterministically for the seed: free shipping at any
+  -- subtotal, so the totals trigger on checkout_session_items keeps
+  -- shipping at 0 and the seeded 5000-cent totals below stay exact
+  -- regardless of the configured rate rules. Rolled back with the script.
+  update public.store_settings
+  set free_shipping_enabled = true,
+      free_shipping_threshold_cents = 0
+  where id = true;
+
   insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
-  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-1', 5000, 0, 5000)
+  values ('verify@example.com', '{"full_name":"Verify Example","address_line1":"123 Verification Way","address_line2":"","country_code":"CA","province_code":"BC","city":"Victoria","postal_code":"V8W 1P6","phone":"250-555-0100"}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-1', 5000, 0, 5000)
   returning id into v_session_id;
 
   insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
@@ -151,7 +163,7 @@ begin
   --    must NOT finalize, even when the amount matches: the discrepancy is
   --    recorded and no order is created.
   insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
-  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-2', 5000, 0, 5000)
+  values ('verify@example.com', '{"full_name":"Verify Example","address_line1":"123 Verification Way","address_line2":"","country_code":"CA","province_code":"BC","city":"Victoria","postal_code":"V8W 1P6","phone":"250-555-0100"}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-2', 5000, 0, 5000)
   returning id into v_session2_id;
 
   insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
@@ -193,7 +205,7 @@ begin
   -- 8. A session whose items carry no snapshot currency at all must fail
   --    closed: the capture cannot be verified against the session.
   insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
-  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-3', 5000, 0, 5000)
+  values ('verify@example.com', '{"full_name":"Verify Example","address_line1":"123 Verification Way","address_line2":"","country_code":"CA","province_code":"BC","city":"Victoria","postal_code":"V8W 1P6","phone":"250-555-0100"}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-3', 5000, 0, 5000)
   returning id into v_session3_id;
 
   insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
@@ -230,7 +242,7 @@ begin
   -- 9. A session whose items carry conflicting snapshot currencies must
   --    fail closed the same way: no single expected currency exists.
   insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
-  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-4', 5000, 0, 5000)
+  values ('verify@example.com', '{"full_name":"Verify Example","address_line1":"123 Verification Way","address_line2":"","country_code":"CA","province_code":"BC","city":"Victoria","postal_code":"V8W 1P6","phone":"250-555-0100"}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-4', 5000, 0, 5000)
   returning id into v_session4_id;
 
   insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
