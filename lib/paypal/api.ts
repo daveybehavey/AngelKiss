@@ -23,9 +23,20 @@ export type PayPalOrderCaptureResponse = {
       captures?: Array<{
         id?: string;
         status?: string;
+        amount?: {
+          value?: string;
+          currency_code?: string;
+        };
       }>;
     };
   }>;
+};
+
+export type PayPalCaptureDetails = {
+  captureId: string;
+  status: string | null;
+  amountValue: string | null;
+  currencyCode: string | null;
 };
 
 type CachedToken = {
@@ -222,6 +233,43 @@ export function extractCaptureId(payload: PayPalOrderCaptureResponse): string | 
     return captureId;
   }
   return null;
+}
+
+/**
+ * Extracts the first capture's id, status, and amount from a capture-order
+ * response. Returns null when the response carries no capture at all (for
+ * example a denied or still-pending order), so callers can refuse to treat
+ * the payment as captured instead of inventing capture details.
+ */
+export function extractCaptureDetails(
+  payload: PayPalOrderCaptureResponse
+): PayPalCaptureDetails | null {
+  const capture = payload.purchase_units?.[0]?.payments?.captures?.[0];
+  if (!capture) {
+    return null;
+  }
+
+  const captureId = typeof capture.id === "string" ? capture.id.trim() : "";
+  if (captureId.length === 0) {
+    return null;
+  }
+
+  const amountValue =
+    typeof capture.amount?.value === "string" && capture.amount.value.trim().length > 0
+      ? capture.amount.value.trim()
+      : null;
+  const currencyCode =
+    typeof capture.amount?.currency_code === "string" &&
+    capture.amount.currency_code.trim().length > 0
+      ? capture.amount.currency_code.trim().toUpperCase()
+      : null;
+
+  return {
+    captureId,
+    status: typeof capture.status === "string" ? capture.status : null,
+    amountValue,
+    currencyCode
+  };
 }
 
 export type PayPalVerifyWebhookSignatureResponse = {

@@ -1,7 +1,7 @@
 import { badRequest, serverError } from "@/lib/http/json";
 import { getRequestMeta } from "@/lib/http/request-meta";
 import { logError, logWarn } from "@/lib/observability/log";
-import { capturePayPalOrder, extractCaptureId } from "@/lib/paypal/api";
+import { capturePayPalOrder, extractCaptureDetails } from "@/lib/paypal/api";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
@@ -91,13 +91,51 @@ export async function POST(
     }
 
     const captureResult = await capturePayPalOrder(checkout.paypal_order_id);
-    const captureId = extractCaptureId(captureResult) ?? `manual-${checkout.paypal_order_id}-${Date.now()}`;
+    const capture = extractCaptureDetails(captureResult);
 
+    // Only a completed capture may finalize the order. Anything else (order
+    // still pending, capture pending/declined, no capture in the response)
+    // leaves the checkout untouched; a real PAYMENT.CAPTURE.COMPLETED webhook
+    // will finalize it if the capture later completes.
+    if (!capture || captureResult.status !== "COMPLETED" || capture.status !== "COMPLETED") {
+      logWarn("checkout.paypal_order.capture.not_completed", {
+        ...requestMeta,
+        checkoutSessionId: id,
+        paypalOrderId: checkout.paypal_order_id,
+        paypalStatus: captureResult.status,
+        captureStatus: capture?.status ?? null
+      });
+      return NextResponse.json(
+        {
+          checkoutSessionId: checkout.id,
+          paypalOrderId: checkout.paypal_order_id,
+          paypalStatus: captureResult.status,
+          finalized: false,
+          orderId: null,
+          orderNumber: null,
+          message:
+            "Your payment has not completed yet. If PayPal shows the payment as pending, your order will be confirmed automatically once it clears.",
+          alreadyCompleted: false
+        },
+        { status: 200 }
+      );
+    }
+
+    const captureId = capture.captureId;
+
+    // Mirror the resource shape of a real PAYMENT.CAPTURE.COMPLETED webhook so
+    // the RPC verifies the actually-captured amount and currency against the
+    // checkout session instead of finalizing on ids alone.
     const syntheticPayload = {
       id: captureId,
       event_type: "PAYMENT.CAPTURE.COMPLETED",
       resource: {
         id: captureId,
+        status: capture.status,
+        amount: {
+          value: capture.amountValue,
+          currency_code: capture.currencyCode
+        },
         supplementary_data: {
           related_ids: {
             order_id: checkout.paypal_order_id
