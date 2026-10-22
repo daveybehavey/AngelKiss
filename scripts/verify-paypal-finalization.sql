@@ -14,6 +14,9 @@ do $$
 declare
   v_product_id uuid;
   v_session_id uuid;
+  v_session2_id uuid;
+  v_session3_id uuid;
+  v_session4_id uuid;
   v_processed boolean;
   v_duplicate boolean;
   v_order_id uuid;
@@ -140,6 +143,93 @@ begin
   select count(*) into v_count from public.payments p join public.orders o on o.id = p.order_id where o.checkout_session_id = v_session_id;
   if v_count <> 1 then raise exception 'FAIL 6: expected exactly one payment, found %', v_count; end if;
   raise notice 'PASS 6: dual delivery converged on one order and one payment';
+
+  -- 7. A capture in a different currency than the session's item snapshots
+  --    must NOT finalize, even when the amount matches: the discrepancy is
+  --    recorded and no order is created.
+  insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
+  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-2', 5000, 0, 5000)
+  returning id into v_session2_id;
+
+  insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
+  values (v_session2_id, v_product_id, 1, 5000, jsonb_build_object('id', v_product_id, 'currency', 'CAD'));
+
+  select processed, duplicate, order_id, message
+    into v_processed, v_duplicate, v_order_id, v_message
+  from public.process_paypal_webhook_event(
+    'evt-verify-currency-mismatch',
+    'PAYMENT.CAPTURE.COMPLETED',
+    '{"resource_type":"capture","resource":{"id":"CAP-VERIFY-2","status":"COMPLETED","amount":{"value":"50.00","currency_code":"USD"},"supplementary_data":{"related_ids":{"order_id":"VERIFY-ORDER-2"}}}}'::jsonb
+  );
+
+  if v_processed then raise exception 'FAIL 7: wrong-currency capture was processed'; end if;
+  select count(*) into v_count from public.orders where checkout_session_id = v_session2_id;
+  if v_count <> 0 then raise exception 'FAIL 7: wrong-currency capture created an order'; end if;
+  if not exists (select 1 from public.paypal_webhook_events where paypal_event_id = 'evt-verify-currency-mismatch' and processing_error like 'Captured amount mismatch%') then
+    raise exception 'FAIL 7: currency mismatch was not recorded in processing_error';
+  end if;
+  if (select status from public.checkout_sessions where id = v_session2_id) <> 'paypal_order_created' then
+    raise exception 'FAIL 7: wrong-currency capture changed the session status';
+  end if;
+  raise notice 'PASS 7: wrong-currency capture rejected and recorded (message: %)', v_message;
+
+  -- 8. A session whose items carry no snapshot currency at all must fail
+  --    closed: the capture cannot be verified against the session.
+  insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
+  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-3', 5000, 0, 5000)
+  returning id into v_session3_id;
+
+  insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
+  values (v_session3_id, v_product_id, 1, 5000, jsonb_build_object('id', v_product_id));
+
+  select processed, duplicate, order_id, message
+    into v_processed, v_duplicate, v_order_id, v_message
+  from public.process_paypal_webhook_event(
+    'evt-verify-no-snapshot-currency',
+    'PAYMENT.CAPTURE.COMPLETED',
+    '{"resource_type":"capture","resource":{"id":"CAP-VERIFY-3","status":"COMPLETED","amount":{"value":"50.00","currency_code":"CAD"},"supplementary_data":{"related_ids":{"order_id":"VERIFY-ORDER-3"}}}}'::jsonb
+  );
+
+  if v_processed then raise exception 'FAIL 8: capture for a session with no snapshot currency was processed'; end if;
+  select count(*) into v_count from public.orders where checkout_session_id = v_session3_id;
+  if v_count <> 0 then raise exception 'FAIL 8: capture with no snapshot currency created an order'; end if;
+  if not exists (select 1 from public.paypal_webhook_events where paypal_event_id = 'evt-verify-no-snapshot-currency' and processing_error like 'Cannot determine a single checkout currency%') then
+    raise exception 'FAIL 8: missing snapshot currency was not recorded in processing_error';
+  end if;
+  if (select status from public.checkout_sessions where id = v_session3_id) <> 'paypal_order_created' then
+    raise exception 'FAIL 8: capture with no snapshot currency changed the session status';
+  end if;
+  raise notice 'PASS 8: session with no snapshot currency failed closed (message: %)', v_message;
+
+  -- 9. A session whose items carry conflicting snapshot currencies must
+  --    fail closed the same way: no single expected currency exists.
+  insert into public.checkout_sessions (customer_email, shipping_address, status, paypal_order_id, subtotal_cents, shipping_cents, total_cents)
+  values ('verify@example.com', '{}'::jsonb, 'paypal_order_created', 'VERIFY-ORDER-4', 5000, 0, 5000)
+  returning id into v_session4_id;
+
+  insert into public.checkout_session_items (checkout_session_id, product_id, quantity, unit_price_cents, product_snapshot)
+  values
+    (v_session4_id, v_product_id, 1, 2500, jsonb_build_object('id', v_product_id, 'currency', 'CAD')),
+    (v_session4_id, v_product_id, 1, 2500, jsonb_build_object('id', v_product_id, 'currency', 'USD'));
+
+  select processed, duplicate, order_id, message
+    into v_processed, v_duplicate, v_order_id, v_message
+  from public.process_paypal_webhook_event(
+    'evt-verify-conflicting-currency',
+    'PAYMENT.CAPTURE.COMPLETED',
+    '{"resource_type":"capture","resource":{"id":"CAP-VERIFY-4","status":"COMPLETED","amount":{"value":"50.00","currency_code":"CAD"},"supplementary_data":{"related_ids":{"order_id":"VERIFY-ORDER-4"}}}}'::jsonb
+  );
+
+  if v_processed then raise exception 'FAIL 9: capture for a session with conflicting snapshot currencies was processed'; end if;
+  select count(*) into v_count from public.orders where checkout_session_id = v_session4_id;
+  if v_count <> 0 then raise exception 'FAIL 9: capture with conflicting snapshot currencies created an order'; end if;
+  if not exists (select 1 from public.paypal_webhook_events where paypal_event_id = 'evt-verify-conflicting-currency' and processing_error like 'Cannot determine a single checkout currency%') then
+    raise exception 'FAIL 9: conflicting snapshot currencies were not recorded in processing_error';
+  end if;
+  if (select status from public.checkout_sessions where id = v_session4_id) <> 'paypal_order_created' then
+    raise exception 'FAIL 9: capture with conflicting snapshot currencies changed the session status';
+  end if;
+  raise notice 'PASS 9: session with conflicting snapshot currencies failed closed (message: %)', v_message;
 
   raise notice 'ALL CHECKS PASSED';
 end $$;
