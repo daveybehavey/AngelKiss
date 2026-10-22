@@ -139,6 +139,18 @@ export function PayPalButton({ checkoutSessionId, onSuccess, onCancel }: PayPalB
               alreadyCompleted: raw.alreadyCompleted === true
             };
 
+            // An HTTP 200 alone does not mean the payment is final: only a
+            // verified, finalized capture (or an already-completed session)
+            // may complete checkout and clear the cart. Anything else keeps
+            // the cart and the payment controls and surfaces the message.
+            if (!normalized.finalized && !normalized.alreadyCompleted) {
+              setError(
+                normalized.message ??
+                  "Your payment has not completed yet. Your cart is still saved — you can try again."
+              );
+              return;
+            }
+
             onSuccess(normalized);
           },
           onError: (callbackError: unknown) => {
