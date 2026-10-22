@@ -237,6 +237,11 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Single-capture assumption: orders are created with intent CAPTURE
+  -- (lib/paypal/api.ts), so each PayPal order carries exactly one capture
+  -- for the full session total. A partial (split) capture therefore fails
+  -- this comparison and is recorded below as a mismatch in
+  -- processing_error, rather than finalizing a partially paid order.
   IF v_captured_cents <> v_checkout.total_cents OR v_captured_currency <> upper(v_expected_currency) THEN
     UPDATE public.paypal_webhook_events
     SET processing_error = concat(
