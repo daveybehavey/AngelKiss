@@ -1,7 +1,7 @@
 import { badRequest, serverError } from "@/lib/http/json";
 import { getRequestMeta } from "@/lib/http/request-meta";
 import { logError, logWarn } from "@/lib/observability/log";
-import { capturePayPalOrder, extractCaptureId } from "@/lib/paypal/api";
+import { capturePayPalOrder, extractCaptureDetails } from "@/lib/paypal/api";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
@@ -91,13 +91,55 @@ export async function POST(
     }
 
     const captureResult = await capturePayPalOrder(checkout.paypal_order_id);
-    const captureId = extractCaptureId(captureResult) ?? `manual-${checkout.paypal_order_id}-${Date.now()}`;
+    const capture = extractCaptureDetails(captureResult);
 
+    // Only a completed capture may finalize the order. Anything else (order
+    // still pending, capture pending/declined, no capture in the response)
+    // leaves the checkout untouched; a real PAYMENT.CAPTURE.COMPLETED webhook
+    // will finalize it if the capture later completes. This is a non-success
+    // response (409): the checkout must not treat an unverified payment as a
+    // completed order or clear the cart for it.
+    if (!capture || captureResult.status !== "COMPLETED" || capture.status !== "COMPLETED") {
+      logWarn("checkout.paypal_order.capture.not_completed", {
+        ...requestMeta,
+        checkoutSessionId: id,
+        paypalOrderId: checkout.paypal_order_id,
+        paypalStatus: captureResult.status,
+        captureStatus: capture?.status ?? null
+      });
+      const message =
+        "Your payment has not completed yet. If PayPal shows the payment as pending, your order will be confirmed automatically once it clears.";
+      return NextResponse.json(
+        {
+          checkoutSessionId: checkout.id,
+          paypalOrderId: checkout.paypal_order_id,
+          paypalStatus: captureResult.status,
+          finalized: false,
+          orderId: null,
+          orderNumber: null,
+          message,
+          error: message,
+          alreadyCompleted: false
+        },
+        { status: 409 }
+      );
+    }
+
+    const captureId = capture.captureId;
+
+    // Mirror the resource shape of a real PAYMENT.CAPTURE.COMPLETED webhook so
+    // the RPC verifies the actually-captured amount and currency against the
+    // checkout session instead of finalizing on ids alone.
     const syntheticPayload = {
       id: captureId,
       event_type: "PAYMENT.CAPTURE.COMPLETED",
       resource: {
         id: captureId,
+        status: capture.status,
+        amount: {
+          value: capture.amountValue,
+          currency_code: capture.currencyCode
+        },
         supplementary_data: {
           related_ids: {
             order_id: checkout.paypal_order_id
@@ -136,20 +178,51 @@ export async function POST(
       }
     }
 
+    const finalized = row?.processed ?? false;
+
+    // The capture completed at PayPal but the finalization RPC refused it
+    // (for example the captured amount or currency did not match the
+    // session; the RPC records the reason in processing_error). No order
+    // exists, so this must not be reported as success: the checkout keeps
+    // the cart and shows the error instead of a confirmation.
+    if (!finalized) {
+      logError(
+        "checkout.paypal_order.capture.finalization_rejected",
+        new Error(row?.message ?? "process_paypal_webhook_event did not process the capture"),
+        {
+          ...requestMeta,
+          checkoutSessionId: id,
+          paypalOrderId: checkout.paypal_order_id,
+          captureId
+        }
+      );
+      const message =
+        "Payment captured; our system is still finalizing your order. Email us if anything looks wrong.";
+      return NextResponse.json(
+        {
+          checkoutSessionId: checkout.id,
+          paypalOrderId: checkout.paypal_order_id,
+          paypalStatus: captureResult.status,
+          finalized: false,
+          orderId: createdOrderId,
+          orderNumber,
+          message: row?.message ?? message,
+          error: message,
+          alreadyCompleted: false
+        },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
       {
         checkoutSessionId: checkout.id,
         paypalOrderId: checkout.paypal_order_id,
         paypalStatus: captureResult.status,
-        finalized: row?.processed ?? false,
+        finalized: true,
         orderId: createdOrderId,
         orderNumber,
-        message: row?.processed
-          ? orderNumber
-            ? null
-            : "Your order is confirmed."
-          : (row?.message ??
-            "Payment captured; our system is still finalizing your order. Email us if anything looks wrong."),
+        message: orderNumber ? null : "Your order is confirmed.",
         alreadyCompleted: false
       },
       { status: 200 }

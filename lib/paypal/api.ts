@@ -23,9 +23,20 @@ export type PayPalOrderCaptureResponse = {
       captures?: Array<{
         id?: string;
         status?: string;
+        amount?: {
+          value?: string;
+          currency_code?: string;
+        };
       }>;
     };
   }>;
+};
+
+export type PayPalCaptureDetails = {
+  captureId: string;
+  status: string | null;
+  amountValue: string | null;
+  currencyCode: string | null;
 };
 
 type CachedToken = {
@@ -164,6 +175,13 @@ async function paypalRequest<TResponse>(
   options: {
     method: "POST" | "GET";
     body?: Record<string, unknown>;
+    /**
+     * Ask PayPal for the full representation of the resource. Without this
+     * PayPal answers with a minimal representation (id, status, links),
+     * which for a capture omits `purchase_units[].payments.captures[]` —
+     * the very payload the capture route verifies the payment from.
+     */
+    preferRepresentation?: boolean;
   }
 ): Promise<TResponse> {
   const token = await getAccessToken();
@@ -171,7 +189,8 @@ async function paypalRequest<TResponse>(
     method: options.method,
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(options.preferRepresentation ? { Prefer: "return=representation" } : {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
@@ -212,7 +231,10 @@ export async function createPayPalOrder(input: {
 
 export async function capturePayPalOrder(orderId: string): Promise<PayPalOrderCaptureResponse> {
   return paypalRequest<PayPalOrderCaptureResponse>(`/v2/checkout/orders/${orderId}/capture`, {
-    method: "POST"
+    method: "POST",
+    // The caller verifies status, capture id, amount, and currency from the
+    // captures payload, so the minimal default representation is not enough.
+    preferRepresentation: true
   });
 }
 
@@ -222,6 +244,43 @@ export function extractCaptureId(payload: PayPalOrderCaptureResponse): string | 
     return captureId;
   }
   return null;
+}
+
+/**
+ * Extracts the first capture's id, status, and amount from a capture-order
+ * response. Returns null when the response carries no capture at all (for
+ * example a denied or still-pending order), so callers can refuse to treat
+ * the payment as captured instead of inventing capture details.
+ */
+export function extractCaptureDetails(
+  payload: PayPalOrderCaptureResponse
+): PayPalCaptureDetails | null {
+  const capture = payload.purchase_units?.[0]?.payments?.captures?.[0];
+  if (!capture) {
+    return null;
+  }
+
+  const captureId = typeof capture.id === "string" ? capture.id.trim() : "";
+  if (captureId.length === 0) {
+    return null;
+  }
+
+  const amountValue =
+    typeof capture.amount?.value === "string" && capture.amount.value.trim().length > 0
+      ? capture.amount.value.trim()
+      : null;
+  const currencyCode =
+    typeof capture.amount?.currency_code === "string" &&
+    capture.amount.currency_code.trim().length > 0
+      ? capture.amount.currency_code.trim().toUpperCase()
+      : null;
+
+  return {
+    captureId,
+    status: typeof capture.status === "string" ? capture.status : null,
+    amountValue,
+    currencyCode
+  };
 }
 
 export type PayPalVerifyWebhookSignatureResponse = {
