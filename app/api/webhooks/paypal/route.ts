@@ -63,44 +63,54 @@ export async function POST(request: Request) {
     }
 
     const webhookId = process.env.PAYPAL_WEBHOOK_ID?.trim();
-    if (webhookId) {
-      const headers = getTransmissionHeaders(request);
-      if (!headers) {
-        logWarn("webhook.paypal.missing_transmission_headers", {
+    if (!webhookId) {
+      // Fail closed: with no webhook ID configured there is nothing to
+      // verify the signature against, and an unverified event must never
+      // reach the order-finalization RPC.
+      logError(
+        "webhook.paypal.not_configured",
+        new Error("PAYPAL_WEBHOOK_ID is not configured"),
+        { ...requestMeta, eventId, eventType }
+      );
+      return serverError("PayPal webhook is not configured");
+    }
+
+    const headers = getTransmissionHeaders(request);
+    if (!headers) {
+      logWarn("webhook.paypal.missing_transmission_headers", {
+        ...requestMeta,
+        eventId,
+        eventType
+      });
+      return badRequest("Missing required PayPal transmission headers");
+    }
+
+    try {
+      const verification = await verifyPayPalWebhookSignature({
+        ...headers,
+        webhookId,
+        webhookEvent: payloadRecord
+      });
+
+      if (verification.verification_status !== "SUCCESS") {
+        logWarn("webhook.paypal.signature_not_verified", {
           ...requestMeta,
           eventId,
-          eventType
+          eventType,
+          verification_status: verification.verification_status
         });
-        return badRequest("Missing required PayPal transmission headers");
+        return unauthorized("PayPal webhook signature verification failed");
       }
-
-      try {
-        const verification = await verifyPayPalWebhookSignature({
-          ...headers,
-          webhookId,
-          webhookEvent: payloadRecord
-        });
-
-        if (verification.verification_status !== "SUCCESS") {
-          logWarn("webhook.paypal.signature_not_verified", {
-            ...requestMeta,
-            eventId,
-            eventType,
-            verification_status: verification.verification_status
-          });
-          return unauthorized("PayPal webhook signature verification failed");
-        }
-      } catch (verifyError) {
-        logError("webhook.paypal.verify_request_failed", verifyError, {
-          ...requestMeta,
-          eventId,
-          eventType
-        });
-        return serverError(
-          "PayPal webhook verification request failed",
-          verifyError instanceof Error ? verifyError.message : verifyError
-        );
-      }
+    } catch (verifyError) {
+      logError("webhook.paypal.verify_request_failed", verifyError, {
+        ...requestMeta,
+        eventId,
+        eventType
+      });
+      return serverError(
+        "PayPal webhook verification request failed",
+        verifyError instanceof Error ? verifyError.message : verifyError
+      );
     }
 
     const supabase = getSupabaseAdminClient();
