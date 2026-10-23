@@ -5,6 +5,7 @@ import {
 } from "@/lib/checkout/customization";
 import {
   appendVariantToCustomization,
+  mergeVariantIntoCustomization,
   validateProductVariantSelection
 } from "@/lib/checkout/variant";
 import { listVariantsForProducts } from "@/lib/storefront/product-variants";
@@ -155,8 +156,13 @@ export async function POST(request: Request) {
         return badRequest(variantOutcome.message);
       }
 
+      // The payload schemas in normalizeCustomizationForCheckout are strict
+      // and have no variant field, so the raw client-supplied variant must
+      // not reach them. The selection was validated above against the
+      // server-side variant list; the server-validated variant is appended
+      // to the normalized customization below (appendVariantToCustomization).
       const normalizedCustomization = normalizeCustomizationForCheckout(
-        item.customization,
+        mergeVariantIntoCustomization(item.customization ?? {}, null),
         product,
         customDetailsByProductId
       );
