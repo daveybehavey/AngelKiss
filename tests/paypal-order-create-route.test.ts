@@ -189,6 +189,21 @@ test("an expiry landing during the PayPal create wins and is not overwritten", a
   assert.equal(sessionRow.paypal_order_id, null);
 });
 
+test("a session that completes after a competing create attached its order still rejects", async () => {
+  resetSession();
+  onPayPalCreate = () => {
+    sessionRow.status = "completed";
+    sessionRow.paypal_order_id = "PAYPAL-WINNER";
+  };
+
+  const { status, body } = await postCreate();
+
+  assert.equal(status, 400, JSON.stringify(body));
+  assert.match(String(body.error), /already completed/i);
+  assert.equal(sessionRow.status, "completed");
+  assert.equal(sessionRow.paypal_order_id, "PAYPAL-WINNER", "the recorded state is left untouched");
+});
+
 test("a competing create that records its order first wins; this create reuses it", async () => {
   resetSession();
   onPayPalCreate = () => {

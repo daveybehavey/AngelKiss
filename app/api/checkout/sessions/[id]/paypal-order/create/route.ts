@@ -127,6 +127,18 @@ export async function POST(
         message: refetchError?.message
       });
 
+      // Terminal status is checked before the recorded order, mirroring
+      // the initial fetch: a session that completed, failed, or expired
+      // after a competing create attached its order must not send the
+      // customer through approval for a dead checkout.
+      if (winner?.status === "completed") {
+        return badRequest("Checkout session already completed");
+      }
+
+      if (winner?.status === "failed" || winner?.status === "expired") {
+        return badRequest(`Checkout session is ${winner.status}`);
+      }
+
       if (winner?.paypal_order_id && winner.paypal_order_id.trim().length > 0) {
         return NextResponse.json(
           {
@@ -136,14 +148,6 @@ export async function POST(
           },
           { status: 200 }
         );
-      }
-
-      if (winner?.status === "completed") {
-        return badRequest("Checkout session already completed");
-      }
-
-      if (winner?.status === "failed" || winner?.status === "expired") {
-        return badRequest(`Checkout session is ${winner.status}`);
       }
 
       return badRequest("Checkout session changed while creating the PayPal order");
