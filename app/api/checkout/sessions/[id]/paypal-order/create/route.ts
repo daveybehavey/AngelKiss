@@ -82,13 +82,22 @@ export async function POST(
       currencyCode: "CAD"
     });
 
-    const { error: updateError } = await supabase
+    // Conditional write: the PayPal create above is a slow external call, and
+    // a concurrent transition (webhook completion, expiry/failure, or a
+    // competing create) can land while it is in flight. Only claim the
+    // session if it is still in a non-terminal state with no PayPal order
+    // attached — terminal states and an already-recorded order win, so this
+    // create can never resurrect or overwrite them.
+    const { data: claimed, error: updateError } = await supabase
       .from("checkout_sessions")
       .update({
         paypal_order_id: paypalOrder.id,
         status: "paypal_order_created"
       })
-      .eq("id", checkout.id);
+      .eq("id", checkout.id)
+      .is("paypal_order_id", null)
+      .in("status", ["open", "paypal_order_created"])
+      .select("id");
 
     if (updateError) {
       logWarn("checkout.paypal_order.create.update_failed", {
@@ -97,6 +106,51 @@ export async function POST(
         message: updateError.message
       });
       return badRequest(updateError.message);
+    }
+
+    if (!claimed || claimed.length === 0) {
+      // The session changed underneath us; the PayPal order just created is
+      // orphaned (nothing references it, so it can never be captured).
+      // Re-read and answer from the winning state.
+      const { data: current, error: refetchError } = await supabase
+        .from("checkout_sessions")
+        .select("id,status,paypal_order_id,total_cents")
+        .eq("id", checkout.id)
+        .maybeSingle();
+
+      const winner = (current as CheckoutSessionRow | null) ?? null;
+      logWarn("checkout.paypal_order.create.race_lost", {
+        ...requestMeta,
+        checkoutSessionId: id,
+        orphanedPaypalOrderId: paypalOrder.id,
+        winnerStatus: winner?.status ?? null,
+        message: refetchError?.message
+      });
+
+      // Terminal status is checked before the recorded order, mirroring
+      // the initial fetch: a session that completed, failed, or expired
+      // after a competing create attached its order must not send the
+      // customer through approval for a dead checkout.
+      if (winner?.status === "completed") {
+        return badRequest("Checkout session already completed");
+      }
+
+      if (winner?.status === "failed" || winner?.status === "expired") {
+        return badRequest(`Checkout session is ${winner.status}`);
+      }
+
+      if (winner?.paypal_order_id && winner.paypal_order_id.trim().length > 0) {
+        return NextResponse.json(
+          {
+            checkoutSessionId: winner.id,
+            paypalOrderId: winner.paypal_order_id,
+            reused: true
+          },
+          { status: 200 }
+        );
+      }
+
+      return badRequest("Checkout session changed while creating the PayPal order");
     }
 
     return NextResponse.json(
