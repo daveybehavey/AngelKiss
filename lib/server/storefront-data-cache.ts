@@ -46,6 +46,29 @@ function shopCacheKeyParts(
   return [categoryFilter ?? "none", sublimationModeFilter ?? "none"];
 }
 
+/**
+ * Resolve the filters the shop list query should run with.
+ *
+ * A mode-only selection (no category, a sublimation mode) means the
+ * custom_sublimation category restricted to that mode. Callers pass
+ * `null` for "no category" (never `undefined`), so the mode branch must
+ * test for null — testing `=== undefined` here silently dropped the
+ * mode and returned the whole category unfiltered.
+ */
+export function resolveShopListFilters(
+  categoryFilter: ProductCategory | null,
+  sublimationModeFilter: SublimationMode | null
+): { category: ProductCategory | undefined; sublimationMode: SublimationMode | undefined } {
+  const category =
+    categoryFilter ?? (sublimationModeFilter ? ("custom_sublimation" as const) : undefined);
+  const sublimationMode =
+    categoryFilter === "custom_sublimation" ||
+    (categoryFilter === null && sublimationModeFilter !== null)
+      ? sublimationModeFilter ?? undefined
+      : undefined;
+  return { category, sublimationMode };
+}
+
 export function loadCachedShopPageData(
   categoryFilter: ProductCategory | null,
   sublimationModeFilter: SublimationMode | null
@@ -55,13 +78,8 @@ export function loadCachedShopPageData(
     async () => {
       try {
         const supabase = getSupabaseAdminClient();
-        const listCategory =
-          categoryFilter ?? (sublimationModeFilter ? ("custom_sublimation" as const) : undefined);
-        const listSublimationMode =
-          categoryFilter === "custom_sublimation" ||
-          (categoryFilter === undefined && sublimationModeFilter !== null)
-            ? sublimationModeFilter ?? undefined
-            : undefined;
+        const { category: listCategory, sublimationMode: listSublimationMode } =
+          resolveShopListFilters(categoryFilter, sublimationModeFilter);
 
         return Promise.all([
           getPublishedShopOverview(supabase),

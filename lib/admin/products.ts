@@ -169,55 +169,16 @@ function applyInventoryFilter(items: AdminProductSummary[], filter: InventoryFil
   return items;
 }
 
-export async function listAdminProducts(
+async function summarizeProductWindow(
   supabase: SupabaseClient,
-  options: ListAdminProductsOptions
-): Promise<{ items: AdminProductSummary[]; nextCursor: string | null }> {
-  const inventoryFilter = options.inventoryFilter ?? "all";
-  const fetchSize = Math.min(Math.max(options.limit * 4, options.limit), 400);
-
-  let query = supabase
-    .from("products")
-    .select(
-      "id,slug,name,category,base_price_cents,currency,inventory_mode,stock_quantity,reserved_quantity,low_stock_threshold,is_available,status,created_at,updated_at,deleted_at"
-    )
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(fetchSize + 1);
-
-  if (options.category) {
-    query = query.eq("category", options.category);
-  }
-
-  if (options.status) {
-    query = query.eq("status", options.status);
-  }
-
-  if (options.cursor) {
-    query = query.lt("created_at", options.cursor);
-  }
-
-  if (options.q) {
-    const q = options.q.trim().replace(/,/g, " ");
-    if (q.length > 0) {
-      query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
-    }
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(safeErrorMessage(error, "Failed to list products"));
-  }
-
-  const rows = ((data ?? []) as ProductRow[]).filter((row) => row.deleted_at === null);
+  rows: ProductRow[],
+  inventoryFilter: InventoryFilter
+): Promise<AdminProductSummary[]> {
   const customProductIds = rows
     .filter((row) => row.category === "custom_sublimation")
     .map((row) => row.id);
 
-  const customDetailsByProductId = new Map<
-    string,
-    CustomSublimationSummaryDetails
-  >();
+  const customDetailsByProductId = new Map<string, CustomSublimationSummaryDetails>();
   if (customProductIds.length > 0) {
     const { data: customDetails, error: customDetailsError } = await supabase
       .from("custom_sublimation_products")
@@ -263,7 +224,7 @@ export async function listAdminProducts(
     uses_local_catalog_fallback: false
   };
 
-  const filtered = applyInventoryFilter(
+  return applyInventoryFilter(
     rows.map((row) =>
       mapSummary(
         row,
@@ -273,12 +234,76 @@ export async function listAdminProducts(
     ),
     inventoryFilter
   );
-  const items = filtered.slice(0, options.limit);
+}
+
+export async function listAdminProducts(
+  supabase: SupabaseClient,
+  options: ListAdminProductsOptions
+): Promise<{ items: AdminProductSummary[]; nextCursor: string | null }> {
+  const inventoryFilter = options.inventoryFilter ?? "all";
+  const fetchSize = Math.min(Math.max(options.limit * 4, options.limit), 400);
+
+  // The inventory filter is applied in memory after the fetch, so a
+  // single bounded window can filter down to nothing while older
+  // matching products exist beyond it. Keep scanning older windows
+  // until the page is full (plus one lookahead match) or the table is
+  // exhausted — otherwise filtered-out windows silently end pagination
+  // and hide every older match.
+  const collected: AdminProductSummary[] = [];
+  let scanCursor = options.cursor;
+  let scanExhausted = false;
+
+  while (collected.length <= options.limit && !scanExhausted) {
+    let query = supabase
+      .from("products")
+      .select(
+        "id,slug,name,category,base_price_cents,currency,inventory_mode,stock_quantity,reserved_quantity,low_stock_threshold,is_available,status,created_at,updated_at,deleted_at"
+      )
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(fetchSize + 1);
+
+    if (options.category) {
+      query = query.eq("category", options.category);
+    }
+
+    if (options.status) {
+      query = query.eq("status", options.status);
+    }
+
+    if (scanCursor) {
+      query = query.lt("created_at", scanCursor);
+    }
+
+    if (options.q) {
+      const q = options.q.trim().replace(/,/g, " ");
+      if (q.length > 0) {
+        query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(safeErrorMessage(error, "Failed to list products"));
+    }
+
+    const rows = ((data ?? []) as ProductRow[]).filter((row) => row.deleted_at === null);
+    if (rows.length <= fetchSize) {
+      // No (fetchSize + 1)th row came back, so this was the last window.
+      scanExhausted = true;
+    }
+    if (rows.length === 0) {
+      break;
+    }
+    scanCursor = rows[rows.length - 1].created_at;
+
+    collected.push(...(await summarizeProductWindow(supabase, rows, inventoryFilter)));
+  }
+
+  const items = collected.slice(0, options.limit);
 
   let nextCursor: string | null = null;
-  if (filtered.length > options.limit) {
-    nextCursor = items[items.length - 1]?.created_at ?? null;
-  } else if (rows.length > fetchSize && items.length > 0) {
+  if (items.length > 0 && (collected.length > options.limit || !scanExhausted)) {
     nextCursor = items[items.length - 1]?.created_at ?? null;
   }
 

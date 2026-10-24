@@ -1,6 +1,6 @@
 import { deleteProductVariant, updateProductVariant } from "@/lib/admin/product-variants";
 import { assertAdminFromRequest } from "@/lib/auth/admin";
-import { badRequest, serverError, unauthorized } from "@/lib/http/json";
+import { badRequest, notFound, serverError, unauthorized } from "@/lib/http/json";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -35,17 +35,20 @@ export async function PATCH(
       return unauthorized(error instanceof Error ? error.message : "Unauthorized");
     }
 
-    const { variantId } = await context.params;
+    const { id, variantId } = await context.params;
     const parsed = patchBodySchema.safeParse(await request.json());
     if (!parsed.success) {
       return badRequest("Invalid request body", parsed.error.flatten());
     }
 
     const supabase = getSupabaseAdminClient();
-    const variant = await updateProductVariant(supabase, variantId, parsed.data);
+    const variant = await updateProductVariant(supabase, id, variantId, parsed.data);
     return NextResponse.json({ variant }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message === "Variant not found for this product") {
+      return notFound(message);
+    }
     if (message.includes("duplicate") || message.includes("unique")) {
       return badRequest(message);
     }
@@ -64,14 +67,15 @@ export async function DELETE(
       return unauthorized(error instanceof Error ? error.message : "Unauthorized");
     }
 
-    const { variantId } = await context.params;
+    const { id, variantId } = await context.params;
     const supabase = getSupabaseAdminClient();
-    await deleteProductVariant(supabase, variantId);
+    await deleteProductVariant(supabase, id, variantId);
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    return serverError(
-      "Unexpected error deleting product variant",
-      error instanceof Error ? error.message : error
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "Variant not found for this product") {
+      return notFound(message);
+    }
+    return serverError("Unexpected error deleting product variant", message);
   }
 }

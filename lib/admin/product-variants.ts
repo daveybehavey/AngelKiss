@@ -52,6 +52,7 @@ export async function createProductVariant(
 
 export async function updateProductVariant(
   supabase: SupabaseClient,
+  productId: string,
   variantId: string,
   patch: {
     label?: string;
@@ -78,15 +79,23 @@ export async function updateProductVariant(
     row.is_available = patch.is_available;
   }
 
+  // The mutation is scoped to the parent product from the route: a
+  // variant id that belongs to a different product must not be reached
+  // through this product's URL.
   const { data, error } = await supabase
     .from("product_variants")
     .update(row)
     .eq("id", variantId)
+    .eq("product_id", productId)
     .select("id,product_id,label,slug,price_cents,sort_order,is_available,created_at,updated_at")
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
-    throw new Error(error?.message || "Failed to update product variant");
+  if (error) {
+    throw new Error(error.message || "Failed to update product variant");
+  }
+
+  if (!data) {
+    throw new Error("Variant not found for this product");
   }
 
   return data as PublicProductVariant;
@@ -94,10 +103,21 @@ export async function updateProductVariant(
 
 export async function deleteProductVariant(
   supabase: SupabaseClient,
+  productId: string,
   variantId: string
 ): Promise<void> {
-  const { error } = await supabase.from("product_variants").delete().eq("id", variantId);
+  const { data, error } = await supabase
+    .from("product_variants")
+    .delete()
+    .eq("id", variantId)
+    .eq("product_id", productId)
+    .select("id");
+
   if (error) {
     throw new Error(error.message || "Failed to delete product variant");
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error("Variant not found for this product");
   }
 }

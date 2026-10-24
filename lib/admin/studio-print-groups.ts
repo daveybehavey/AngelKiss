@@ -134,6 +134,27 @@ export async function replaceStudioPrintGroupMembers(
   groupId: string,
   printIds: string[]
 ): Promise<void> {
+  // Snapshot the current membership first: the delete and the insert
+  // are separate statements, so if the insert fails the previous
+  // members are restored before the error propagates — the group is
+  // never left emptied by a rejected replacement.
+  const { data: existing, error: loadError } = await supabase
+    .from("studio_print_group_members")
+    .select("studio_print_id,sort_order")
+    .eq("group_id", groupId);
+
+  if (loadError) {
+    throw new Error(loadError.message || "Failed to load current group members");
+  }
+
+  const previousRows = ((existing ?? []) as Array<{ studio_print_id: string; sort_order: number }>).map(
+    (row) => ({
+      group_id: groupId,
+      studio_print_id: row.studio_print_id,
+      sort_order: row.sort_order
+    })
+  );
+
   const { error: deleteError } = await supabase
     .from("studio_print_group_members")
     .delete()
@@ -156,6 +177,16 @@ export async function replaceStudioPrintGroupMembers(
 
   const { error: insertError } = await supabase.from("studio_print_group_members").insert(rows);
   if (insertError) {
+    if (previousRows.length > 0) {
+      const { error: restoreError } = await supabase
+        .from("studio_print_group_members")
+        .insert(previousRows);
+      if (restoreError) {
+        throw new Error(
+          `Failed to assign prints to group (${insertError.message}) and failed to restore the previous members (${restoreError.message})`
+        );
+      }
+    }
     throw new Error(insertError.message || "Failed to assign prints to group");
   }
 }
