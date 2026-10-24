@@ -10,7 +10,10 @@ import {
   catalogMediaUsesR2Uploads,
   getCatalogMediaUploadBlockReason
 } from "@/lib/server/catalog-media-storage";
-import { createR2PresignedPutForCatalogObject } from "@/lib/server/r2-product-media";
+import {
+  createR2PresignedPutForCatalogObject,
+  R2_CATALOG_UPLOAD_URL_TTL_SEC
+} from "@/lib/server/r2-product-media";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -63,14 +66,18 @@ export async function POST(
       const objectKey = normalizeStoragePathForBucket(storagePath, bucket);
       const uploadUrl = await createR2PresignedPutForCatalogObject({
         objectKey,
-        contentType: parsed.data.content_type
+        contentType: parsed.data.content_type,
+        expiresSeconds: R2_CATALOG_UPLOAD_URL_TTL_SEC
       });
       return NextResponse.json(
         {
           uploadUrl,
           storagePath,
           bucket,
-          expiresAt: new Date(Date.now() + SIGNED_UPLOAD_TTL_MS).toISOString(),
+          // The R2 URL is signed for R2_CATALOG_UPLOAD_URL_TTL_SEC (1h);
+          // advertising the 2h Supabase TTL here sent clients to a dead
+          // URL for the second hour.
+          expiresAt: new Date(Date.now() + R2_CATALOG_UPLOAD_URL_TTL_SEC * 1000).toISOString(),
           provider: "r2" as const
         },
         { status: 200 }

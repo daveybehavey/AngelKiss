@@ -51,6 +51,11 @@ function getS3Client(): S3Client {
   return cachedClient;
 }
 
+/** Lifetime of a presigned R2 catalog upload URL. Routes that hand the
+ *  URL to a client advertise `expiresAt` from this constant so the
+ *  advertised expiry can never drift from what was actually signed. */
+export const R2_CATALOG_UPLOAD_URL_TTL_SEC = 3600;
+
 export async function createR2PresignedPutForCatalogObject(options: {
   objectKey: string;
   contentType: string;
@@ -68,7 +73,7 @@ export async function createR2PresignedPutForCatalogObject(options: {
   const client = getS3Client();
   // Presigner typings can disagree with `S3Client` when npm dedupes Smithy packages differently; runtime is valid for R2.
   return getSignedUrl(client as any, cmd, {
-    expiresIn: options.expiresSeconds ?? 3600
+    expiresIn: options.expiresSeconds ?? R2_CATALOG_UPLOAD_URL_TTL_SEC
   });
 }
 

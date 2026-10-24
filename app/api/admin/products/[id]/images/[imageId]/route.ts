@@ -57,18 +57,9 @@ export async function PATCH(
       return notFound("Image not found for this product");
     }
 
-    if (parsed.data.is_primary === true) {
-      const { error: clearPrimaryError } = await supabase
-        .from("product_images")
-        .update({ is_primary: false })
-        .eq("product_id", id)
-        .eq("is_primary", true);
-
-      if (clearPrimaryError) {
-        return badRequest(clearPrimaryError.message);
-      }
-    }
-
+    // Validate before mutating: the variant ownership check must run
+    // before the primary flag is cleared, or a rejected request leaves
+    // the product with no primary image.
     if (parsed.data.variant_id) {
       const { data: variantRow, error: variantError } = await supabase
         .from("product_variants")
@@ -81,6 +72,18 @@ export async function PATCH(
       }
       if (!variantRow) {
         return badRequest("variant_id does not belong to this product");
+      }
+    }
+
+    if (parsed.data.is_primary === true) {
+      const { error: clearPrimaryError } = await supabase
+        .from("product_images")
+        .update({ is_primary: false })
+        .eq("product_id", id)
+        .eq("is_primary", true);
+
+      if (clearPrimaryError) {
+        return badRequest(clearPrimaryError.message);
       }
     }
 
