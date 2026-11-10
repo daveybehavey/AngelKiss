@@ -77,8 +77,9 @@ export function StudioPrintGalleryGrid({
                   fill
                   className="studio-print-gallery-thumb-img"
                   sizes="(max-width: 520px) 45vw, 200px"
-                  loading={index < 8 ? "eager" : "lazy"}
+                  loading={index < 4 ? "eager" : "lazy"}
                   decoding="async"
+                  fetchPriority={index === 0 ? "high" : index < 4 ? "low" : "auto"}
                   unoptimized={storefrontGridImageUnoptimized(thumbSrc)}
                 />
               </span>

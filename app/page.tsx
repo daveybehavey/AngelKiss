@@ -96,6 +96,7 @@ export default function HomePage() {
               alt=""
               width={320}
               height={240}
+              sizes="(max-width: 700px) 42vw, 320px"
               loading="lazy"
               decoding="async"
             />
@@ -154,6 +155,7 @@ export default function HomePage() {
               alt="Cydney at the AnglKiss Creations market booth"
               width={1200}
               height={900}
+              sizes="(max-width: 900px) 92vw, 480px"
               loading="lazy"
               decoding="async"
             />
@@ -205,6 +207,7 @@ export default function HomePage() {
                 alt="Custom-printed mugs at the craft fair booth"
                 width={800}
                 height={600}
+                sizes="(max-width: 700px) 92vw, (max-width: 1100px) 55vw, 560px"
                 loading="lazy"
                 decoding="async"
               />
@@ -230,6 +233,7 @@ export default function HomePage() {
                 alt="Ready-made studio print designs on mugs and tumblers"
                 width={800}
                 height={600}
+                sizes="(max-width: 700px) 92vw, (max-width: 1100px) 40vw, 360px"
                 loading="lazy"
                 decoding="async"
               />
@@ -252,6 +256,7 @@ export default function HomePage() {
                 alt="Crochet frog with a small plant in a cozy handmade setup"
                 width={800}
                 height={500}
+                sizes="(max-width: 700px) 92vw, min(1100px, 92vw)"
                 loading="lazy"
                 decoding="async"
               />

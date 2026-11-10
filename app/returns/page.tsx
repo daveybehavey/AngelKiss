@@ -3,10 +3,12 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Returns & Refunds",
   description: "Returns and refund policy for AnglKiss Creations.",
+  alternates: { canonical: "/returns" },
   openGraph: {
     title: "Returns & Refunds | AnglKiss Creations",
     description: "How returns work and when refunds apply.",
-    type: "website"
+    type: "website",
+    url: "/returns"
   },
   twitter: {
     card: "summary",

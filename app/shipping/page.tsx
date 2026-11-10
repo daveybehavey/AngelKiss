@@ -3,10 +3,12 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Shipping Policy",
   description: "Shipping zones, rates, and delivery expectations for AnglKiss Creations.",
+  alternates: { canonical: "/shipping" },
   openGraph: {
     title: "Shipping Policy | AnglKiss Creations",
     description: "Where we ship, how rates work, and what to expect at checkout.",
-    type: "website"
+    type: "website",
+    url: "/shipping"
   },
   twitter: {
     card: "summary",

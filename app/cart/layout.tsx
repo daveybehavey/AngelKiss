@@ -4,10 +4,18 @@ import type { ReactNode } from "react";
 export const metadata: Metadata = {
   title: "Cart",
   description: "Review your AnglKiss Creations cart before secure checkout.",
+  robots: {
+    index: false,
+    follow: true
+  },
+  alternates: {
+    canonical: "/cart"
+  },
   openGraph: {
     title: "Your cart | AnglKiss Creations",
     description: "Review your cart before checkout.",
-    type: "website"
+    type: "website",
+    url: "/cart"
   },
   twitter: {
     card: "summary",

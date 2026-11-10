@@ -1,6 +1,8 @@
 import { ProductPurchaseSection } from "@/components/storefront/product-purchase-section";
 import { formatShopperProductTitle } from "@/lib/storefront/product-display";
 import { getPublicProductBySlugCached } from "@/lib/storefront/get-public-product-cached";
+import { buildProductJsonLd } from "@/lib/seo/product-json-ld";
+import { getSiteOrigin } from "@/lib/site-url";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -71,19 +73,36 @@ export async function generateMetadata({
       product.short_description?.trim() ||
       product.long_description?.trim().slice(0, 160) ||
       `Shop ${displayName} at AnglKiss Creations.`;
+    const canonicalPath = `/shop/${product.slug}`;
+    const ogImages = product.primary_image_url
+      ? [
+          {
+            url: product.primary_image_url,
+            alt:
+              product.primary_image_alt?.trim() ||
+              displayName
+          }
+        ]
+      : undefined;
 
     return {
       title: displayName,
       description,
+      alternates: {
+        canonical: canonicalPath
+      },
       openGraph: {
         title: displayName,
         description,
-        type: "website"
+        type: "website",
+        url: canonicalPath,
+        ...(ogImages ? { images: ogImages } : {})
       },
       twitter: {
         card: "summary_large_image",
         title: displayName,
-        description
+        description,
+        ...(ogImages ? { images: [ogImages[0].url] } : {})
       }
     };
   } catch {
@@ -118,8 +137,35 @@ export default async function ProductPage({
       ? formatDisplayBlankColor(product.custom_sublimation_details.default_blank_color)
       : null;
 
+  const productDescription =
+    product.short_description?.trim() ||
+    product.long_description?.trim().slice(0, 160) ||
+    `Shop ${displayTitle} at AnglKiss Creations.`;
+
+  const availability =
+    product.inventory_mode === "made_to_order"
+      ? ("https://schema.org/PreOrder" as const)
+      : product.is_sold_out
+        ? ("https://schema.org/OutOfStock" as const)
+        : ("https://schema.org/InStock" as const);
+
+  const productJsonLd = buildProductJsonLd({
+    name: displayTitle,
+    description: productDescription,
+    urlPath: `/shop/${product.slug}`,
+    siteOrigin: getSiteOrigin(),
+    imageUrl: product.primary_image_url,
+    currency: product.currency,
+    priceCents: product.base_price_cents,
+    availability
+  });
+
   return (
     <main className="page-main product-page">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <p className="product-back-row">
         <Link href="/shop" className="product-back-link">
           Back to shop

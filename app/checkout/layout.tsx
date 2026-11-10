@@ -9,10 +9,14 @@ export const metadata: Metadata = {
     index: false,
     follow: true
   },
+  alternates: {
+    canonical: "/checkout"
+  },
   openGraph: {
     title: "Checkout | AnglKiss Creations",
     description: "Secure PayPal checkout for handmade and custom-print orders.",
-    type: "website"
+    type: "website",
+    url: "/checkout"
   },
   twitter: {
     card: "summary",
