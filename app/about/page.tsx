@@ -10,13 +10,29 @@ export const metadata: Metadata = {
   title: "About",
   description:
     "Meet Cydney, the maker behind AnglKiss Creations—handmade crochet and custom photo prints from Vancouver Island.",
+  alternates: { canonical: "/about" },
   openGraph: {
     title: "About | AnglKiss Creations",
     description:
       "Handmade crochet gifts and custom prints, made with care on Vancouver Island. Pop-ups, markets, and online orders across Canada.",
-    type: "website"
+    type: "website",
+    url: "/about",
+    images: [
+      {
+        url: ABOUT_BOOTH_PHOTO.src,
+        width: 1200,
+        height: 900,
+        alt: ABOUT_BOOTH_PHOTO.alt
+      }
+    ]
   },
-  alternates: { canonical: "/about" }
+  twitter: {
+    card: "summary_large_image",
+    title: "About | AnglKiss Creations",
+    description:
+      "Meet Cydney, the maker behind AnglKiss Creations—handmade crochet and custom photo prints from Vancouver Island.",
+    images: [ABOUT_BOOTH_PHOTO.src]
+  }
 };
 
 export default function AboutPage() {
@@ -48,6 +64,7 @@ export default function AboutPage() {
               alt={ABOUT_BOOTH_PHOTO.alt}
               width={1200}
               height={900}
+              sizes="(max-width: 900px) 92vw, 560px"
               loading="eager"
               decoding="async"
               fetchPriority="high"
