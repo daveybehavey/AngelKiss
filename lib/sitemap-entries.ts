@@ -1,12 +1,11 @@
 import type { MetadataRoute } from "next";
 
+/** Indexable marketing/legal routes only — cart/checkout/admin/api stay out. */
 export const STATIC_SITEMAP_PATHS = [
   "",
   "/shop",
   "/gallery",
   "/about",
-  "/cart",
-  "/checkout",
   "/shipping",
   "/returns",
   "/privacy"

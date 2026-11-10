@@ -59,6 +59,14 @@ export async function generateMetadata({
     sublimationMode: sublimationMode
   });
 
+  /** Existing site OG art from root layout marketing path — reused, not invented. */
+  const shopOgImage = {
+    url: "/marketing/home-gallery/stand-04.webp",
+    width: 1200,
+    height: 630,
+    alt: "AnglKiss Creations market booth — handmade crochet and custom prints"
+  } as const;
+
   return {
     title,
     description,
@@ -69,12 +77,14 @@ export async function generateMetadata({
       title,
       description,
       type: "website",
-      url: canonicalPath
+      url: canonicalPath,
+      images: [shopOgImage]
     },
     twitter: {
       card: "summary_large_image",
       title,
-      description
+      description,
+      images: [shopOgImage.url]
     }
   };
 }

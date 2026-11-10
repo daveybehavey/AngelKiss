@@ -3,10 +3,12 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "How AnglKiss Creations collects, uses, and protects your information.",
+  alternates: { canonical: "/privacy" },
   openGraph: {
     title: "Privacy Policy | AnglKiss Creations",
     description: "What we collect at checkout and how we keep your data safe.",
-    type: "website"
+    type: "website",
+    url: "/privacy"
   },
   twitter: {
     card: "summary",
